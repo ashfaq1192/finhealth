@@ -1,14 +1,11 @@
 export const runtime = "edge";
 
 import { supabase } from "@/lib/supabase";
-import dynamic from "next/dynamic";
 import ScoreCard, { ScoreState } from "@/components/ScoreCard";
 import AdSlot from "@/components/AdSlot";
-
-const TrendChart = dynamic(() => import("@/components/TrendChart"), {
-  ssr: false,
-  loading: () => <div className="mt-8 h-40 bg-gray-50 rounded animate-pulse" />,
-});
+import TrendChartWrapper from "@/components/TrendChartWrapper";
+import Link from "next/link";
+import TodaysFocus from "@/components/TodaysFocus";
 
 interface ScoreRow {
   date: string;
@@ -24,7 +21,6 @@ async function getLatestScore(): Promise<ScoreRow | null> {
     .order("date", { ascending: false })
     .limit(1)
     .single();
-
   if (error || !data) return null;
   return data as ScoreRow;
 }
@@ -35,9 +31,17 @@ async function getRecentScores(): Promise<ScoreRow[]> {
     .select("date, health_score, status_label, reasoning")
     .order("date", { ascending: false })
     .limit(30);
-
   if (error || !data) return [];
   return data as ScoreRow[];
+}
+
+async function getLatestPosts() {
+  const { data } = await supabase
+    .from("blog_posts")
+    .select("date, title, slug, category, meta_description")
+    .order("date", { ascending: false })
+    .limit(3);
+  return data ?? [];
 }
 
 function computeScoreState(latest: ScoreRow | null): ScoreState {
@@ -53,26 +57,129 @@ function computeScoreState(latest: ScoreRow | null): ScoreState {
   return "unavailable";
 }
 
+function formatDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Trucking: "bg-blue-100 text-blue-700",
+  Retail: "bg-purple-100 text-purple-700",
+  "SBA Loans": "bg-green-100 text-green-700",
+  Macro: "bg-slate-100 text-slate-700",
+  Staffing: "bg-orange-100 text-orange-700",
+};
+
 export default async function HomePage() {
-  const [latest, recentScores] = await Promise.all([
+  const [latest, recentScores, latestPosts] = await Promise.all([
     getLatestScore(),
     getRecentScores(),
+    getLatestPosts(),
   ]);
 
   const state = computeScoreState(latest);
   const adVisible = state !== "unavailable" && state !== "cold-start";
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
-      <ScoreCard
-        score={latest?.health_score ?? null}
-        label={latest?.status_label ?? null}
-        date={latest?.date ?? null}
-        reasoning={latest?.reasoning ?? []}
-        state={state}
-      />
-      <AdSlot visible={adVisible} slot="homepage-below-score" />
-      <TrendChart data={recentScores} />
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Hero row */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+        {/* Score card — wider */}
+        <div className="lg:col-span-3">
+          <ScoreCard
+            score={latest?.health_score ?? null}
+            label={latest?.status_label ?? null}
+            date={latest?.date ?? null}
+            reasoning={latest?.reasoning ?? []}
+            state={state}
+          />
+        </div>
+
+        {/* Side panel */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* About card */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 flex-1">
+            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-3">
+              What Is This?
+            </p>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              A daily composite score (0–100) measuring how favourable US economic
+              conditions are for small business funding. Powered by 6 Federal Reserve
+              indicators updated each morning.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-500">
+              {[
+                ["Prime Rate", "Borrowing cost"],
+                ["Yield Curve", "Credit signal"],
+                ["C&I Tightening", "Bank lending"],
+                ["Jobless Claims", "Labour market"],
+                ["Biz Applications", "Entrepreneur activity"],
+                ["Updated", "Daily 9 AM EST"],
+              ].map(([k, v]) => (
+                <div key={k} className="bg-slate-50 rounded-lg p-2">
+                  <div className="font-semibold text-slate-700">{k}</div>
+                  <div>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Today's industry focus */}
+          {latestPosts[0] && <TodaysFocus post={latestPosts[0]} />}
+
+          {/* Ad slot */}
+          <AdSlot visible={adVisible} slot="homepage-sidebar" />
+        </div>
+      </div>
+
+      {/* Trend chart */}
+      {recentScores.length > 1 && (
+        <div className="bg-white rounded-2xl border border-slate-200 px-6 pt-6 pb-4 mb-6">
+          <TrendChartWrapper data={recentScores} />
+        </div>
+      )}
+
+      {/* Latest analysis */}
+      {latestPosts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+              Latest Analysis
+            </p>
+            <Link
+              href="/blog"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+            >
+              View all →
+            </Link>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {latestPosts.map((post) => (
+              <li key={post.slug} className="py-3 first:pt-0 last:pb-0">
+                <Link href={`/blog/${post.slug}`} className="group flex gap-3 items-start">
+                  <span
+                    className={`mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      CATEGORY_COLORS[post.category] ?? "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {post.category}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors leading-snug">
+                      {post.title}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">{formatDate(post.date)}</p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -208,3 +208,10 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 
 ## Code Standards
 See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
+
+## Active Technologies
+- Python 3.11+ (backend), TypeScript / Node.js 20+ (frontend) (001-funding-health-dashboard)
+- PostgreSQL via Supabase free tier — 2 tables: `daily_scores`, `blog_posts` (001-funding-health-dashboard)
+
+## Recent Changes
+- 001-funding-health-dashboard: Added Python 3.11+ (backend), TypeScript / Node.js 20+ (frontend)
