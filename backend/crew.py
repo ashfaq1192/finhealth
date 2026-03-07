@@ -16,6 +16,8 @@ import os
 import sys
 from datetime import datetime, timezone
 
+from json_repair import repair_json
+
 from dotenv import load_dotenv
 from supabase import create_client
 
@@ -30,9 +32,15 @@ from agents import data_fetcher_agent, economist_agent, writer_agent
 
 
 def _parse_json_output(raw: str) -> dict | list:
-    """Extract JSON from CrewAI output which may include surrounding text."""
+    """Extract and repair JSON from CrewAI output which may include surrounding text."""
     raw = raw.strip()
-    # Find first { or [ and last } or ]
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    # Find first { or [
     start = min(
         (raw.find("{") if "{" in raw else len(raw)),
         (raw.find("[") if "[" in raw else len(raw)),
@@ -41,9 +49,9 @@ def _parse_json_output(raw: str) -> dict | list:
         end = raw.rfind("}") + 1
     else:
         end = raw.rfind("]") + 1
-    if start < end:
-        return json.loads(raw[start:end])
-    return json.loads(raw)
+    candidate = raw[start:end] if start < end else raw
+    # Use json_repair to handle control characters and minor malformations
+    return json.loads(repair_json(candidate))
 
 
 def run() -> int:
@@ -84,8 +92,21 @@ def run() -> int:
         )
         result = crew.kickoff()
 
+        # In CrewAI 1.x, task outputs are in result.tasks_output list
+        tasks_output = getattr(result, "tasks_output", [])
+        economist_output = tasks_output[1].raw if len(tasks_output) > 1 else ""
+        writer_output = tasks_output[2].raw if len(tasks_output) > 2 else ""
+
+        # Fallback: try direct task.output attribute (older CrewAI compat)
+        if not economist_output:
+            economist_output = getattr(getattr(economist_task, "output", None), "raw", "") or ""
+        if not writer_output:
+            writer_output = getattr(getattr(writer_task, "output", None), "raw", "") or ""
+
+        print(f"[crew] Economist output preview: {economist_output[:120]}")
+        print(f"[crew] Writer output preview: {writer_output[:120]}")
+
         # Parse reasoning bullets from economist task output
-        economist_output = economist_task.output.raw if hasattr(economist_task, "output") else ""
         try:
             reasoning = _parse_json_output(economist_output)
             if not isinstance(reasoning, list):
@@ -97,14 +118,14 @@ def run() -> int:
             reasoning = [
                 f"Prime rate stands at {indicators['dprime']}%, affecting borrowing costs.",
                 f"Treasury yield spread at {indicators['t10y2y']}% signals credit conditions.",
-                f"Weekly jobless claims at {indicators['icsa']:,} reflect labour market health.",
+                f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labour market health.",
             ]
 
         # Parse blog post from writer task output
-        writer_output = writer_task.output.raw if hasattr(writer_task, "output") else ""
         try:
             post_data = _parse_json_output(writer_output)
-        except Exception:
+        except Exception as exc:
+            print(f"[crew] WARNING: Could not parse blog post JSON: {exc}", file=sys.stderr)
             post_data = None
 
     except Exception as exc:
@@ -135,8 +156,8 @@ def run() -> int:
             "drtscilm": indicators["drtscilm"],
             "drtscis": indicators["drtscis"],
             "t10y2y": indicators["t10y2y"],
-            "icsa": indicators["icsa"],
-            "busappwnsaus": indicators["busappwnsaus"],
+            "icsa": int(indicators["icsa"]),
+            "busappwnsaus": int(indicators["busappwnsaus"]),
             "busapp_trending_up": indicators.get("busapp_trending_up", False),
             "updated_at": now_iso,
         }

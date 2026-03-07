@@ -1,21 +1,20 @@
 """
 CrewAI agent definitions.
-Each agent has an explicit llm= to avoid OPENAI_API_KEY fallback (Constitution Principle V).
+Uses CrewAI native LLM class with LiteLLM routing to Groq.
 """
 
 import os
 
-from crewai import Agent
-from langchain_groq import ChatGroq
+from crewai import Agent, LLM
 
 
-def _llm() -> ChatGroq:
-    """Create a ChatGroq LLM instance. Called fresh for each agent."""
-    return ChatGroq(
+def _llm() -> LLM:
+    """Create a CrewAI LLM instance routed to Groq via LiteLLM."""
+    return LLM(
         model="groq/llama-3.3-70b-versatile",
+        api_key=os.environ["GROQ_API_KEY"],
         temperature=0.3,
         max_tokens=2048,
-        groq_api_key=os.environ["GROQ_API_KEY"],
     )
 
 
