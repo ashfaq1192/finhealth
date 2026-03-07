@@ -1,55 +1,157 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT
+==================
+Version change: 1.0.0 → 1.0.1  (patch — remove deploy hook mandate; edge runtime adopted)
+Modified principles:
+  - IV. Automation-First: removed "deploy hook" bullet (superseded by edge runtime decision)
+  - V. Security: removed CF_DEPLOY_HOOK from required secrets list
+Technical Constraints:
+  - Build Order step 5 removed (no deploy hook needed)
+Deferred TODOs:
+  - RATIFICATION_DATE confirmed: 2026-03-07
+  - Domain name not yet registered — placeholder in blueprint.md
+Rationale: /sp.plan adopted Cloudflare Pages edge runtime (Next.js Server Components fetch
+  Supabase on every request). A deploy hook rebuild is no longer needed or correct.
+  ADR pending: /sp.adr edge-runtime-vs-static-ssg
+-->
+
+# FinHealth Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Zero-Cost Architecture (NON-NEGOTIABLE)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+All infrastructure choices MUST fit within a $0–$5/month operating budget.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+- Hosting MUST use Cloudflare Pages (free tier, commercial use permitted).
+  Vercel Hobby plan is PROHIBITED — its ToS forbids commercial/revenue-generating use.
+- Database MUST use Supabase free tier (500 MB DB, 10 GB bandwidth).
+- LLM inference MUST use Groq free tier (llama-3.3-70b-versatile; 500 K tokens/day limit).
+- Automation MUST use GitHub Actions on a PUBLIC repository to retain unlimited free minutes.
+- Any new dependency or service MUST be evaluated against the budget cap before adoption.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### II. Verified Data Only (NON-NEGOTIABLE)
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+All economic indicators MUST be sourced from verified, publicly accessible FRED series IDs.
+Invented, assumed, or unverified series IDs are PROHIBITED.
 
-### [PRINCIPLE_6_NAME]
+Canonical FRED series IDs for this project:
 
+| Indicator                         | FRED ID        | Frequency |
+|-----------------------------------|----------------|-----------|
+| Bank Prime Loan Rate (daily)      | `DPRIME`       | Daily     |
+| C&I Tightening — Large Firms      | `DRTSCILM`     | Quarterly |
+| C&I Tightening — Small Firms      | `DRTSCIS`      | Quarterly |
+| Business Applications             | `BUSAPPWNSAUS` | Weekly    |
+| 10-2yr Treasury Yield Spread      | `T10Y2Y`       | Daily     |
+| Initial Jobless Claims            | `ICSA`         | Weekly    |
 
-[PRINCIPLE__DESCRIPTION]
+Any change to these series MUST be verified on fred.stlouisfed.org before implementation
+and documented in an ADR.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### III. E-E-A-T Content Integrity
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+All AI-generated content MUST meet Google's E-E-A-T standards
+(Experience, Expertise, Authoritativeness, Trustworthiness).
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- Every blog post MUST reference the current score and at least two FRED data points.
+- The M.Phil Economics authority framing MUST be consistent across all content.
+- The compliance disclaimer MUST appear as a sticky footer on every page:
+  > "Disclaimer: This score is an AI-generated economic indicator for educational purposes
+  > only. We are not a financial institution. Always consult a licensed financial advisor
+  > before making borrowing decisions."
+- Content MUST NOT make direct investment or lending recommendations.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### IV. Automation-First (No Manual Data Entry)
+
+Every data fetch, score calculation, and blog post generation MUST be triggered
+automatically via GitHub Actions cron (daily at 14:00 UTC / 09:00 AM EST).
+
+- The Python CrewAI pipeline MUST be the sole writer to Supabase `daily_scores`
+  and `blog_posts` tables.
+- Manual edits to score data in the database are PROHIBITED during normal operation.
+- The frontend MUST use Cloudflare Pages edge runtime so that every page request
+  fetches fresh data from Supabase without requiring a rebuild or deploy hook.
+
+### V. Security — No Hardcoded Secrets
+
+Secrets MUST NEVER appear in source code or committed files.
+
+- All API keys and credentials MUST be stored in GitHub Actions secrets and loaded
+  as environment variables at runtime.
+- Required secrets: `FRED_API_KEY`, `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`.
+- The `.env` file MUST be listed in `.gitignore`.
+- CrewAI agents MUST have the LLM set explicitly via `llm=ChatGroq(...)`.
+  Relying on `OPENAI_API_KEY` environment variable fallback is PROHIBITED.
+
+### VI. Minimal Viable Change
+
+Every implementation task MUST be the smallest change that satisfies the requirement.
+
+- Do not add features, abstractions, or error-handling paths not specified in the
+  current task.
+- Do not refactor unrelated code during a feature implementation.
+- Prefer editing existing files over creating new ones.
+- Three similar lines of code are acceptable — premature abstraction is not.
+
+---
+
+## Technical Constraints
+
+### Approved Stack
+
+| Layer        | Technology                              | Version   |
+|--------------|-----------------------------------------|-----------|
+| Frontend     | Next.js (App Router) + Tailwind CSS     | 15+       |
+| Hosting      | Cloudflare Pages                        | Free tier |
+| Database     | Supabase (PostgreSQL)                   | Free tier |
+| Orchestration| CrewAI + langchain-groq                 | Latest    |
+| LLM          | Groq — llama-3.3-70b-versatile          | Current   |
+| Data         | FRED API                                | v2        |
+| Automation   | GitHub Actions                          | Current   |
+
+### Prohibited Choices
+
+- Vercel (commercial ToS violation on Hobby plan)
+- OpenAI API (cost — Groq free tier is sufficient)
+- Any paid database tier during initial phase
+- Private GitHub repo (loses free Actions minutes)
+
+### Build Order (must be followed)
+
+1. Supabase schema SQL migrations
+2. Python CrewAI backend (`/backend/crew.py`)
+3. GitHub Actions workflow (`.github/workflows/main.yml`)
+4. Next.js 15 frontend (gauge dashboard + blog) with edge runtime
+
+---
+
+## Content & Compliance Standards
+
+- Score MUST be framed as "Business Funding Climate Score" — NOT "Daily Score",
+  because source data (DRTSCILM/DRTSCIS) is quarterly.
+- Score labels MUST follow this mapping:
+  - 80–100: Optimal
+  - 60–79: Moderate
+  - 40–59: Risky
+  - 0–39:  Critical
+- Blog posts MUST be 600+ words, targeting high-CPC US finance keywords.
+- AdSense placement MUST NOT interfere with primary content readability.
+- All pages MUST be accessible (WCAG 2.1 AA minimum) and mobile-responsive.
+
+---
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- This constitution supersedes all other project documentation on matters of
+  architecture, stack choice, and compliance.
+- Amendments require: (a) documented rationale, (b) version bump per semver rules,
+  (c) update to MEMORY.md and blueprint.md, (d) ADR if architecturally significant.
+- Version bump rules:
+  - MAJOR: Principle removal, hosting platform change, LLM provider change.
+  - MINOR: New principle or section added.
+  - PATCH: Clarifications, wording, non-semantic fixes.
+- All PRs MUST verify compliance with Principles I–VI before merge.
+- Constitution is reviewed when any new external service or dependency is proposed.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.1 | **Ratified**: 2026-03-07 | **Last Amended**: 2026-03-07
