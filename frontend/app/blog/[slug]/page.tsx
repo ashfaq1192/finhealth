@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import AdSlot from "@/components/AdSlot";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtmlLib from "sanitize-html";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -69,7 +69,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 function sanitizeHtml(markdown: string): string {
   const html = marked.parse(markdown) as string;
-  return DOMPurify.sanitize(html);
+  const clean = sanitizeHtmlLib(html, {
+    allowedTags: sanitizeHtmlLib.defaults.allowedTags.concat(["h1", "h2", "h3"]),
+    allowedAttributes: { a: ["href", "target", "rel"], ...sanitizeHtmlLib.defaults.allowedAttributes },
+  });
+  // Strip leading H1 — the title is already shown in the article header
+  return clean.replace(/^\s*<h1[^>]*>.*?<\/h1>\s*/i, "");
 }
 
 function formatDate(iso: string): string {
@@ -140,12 +145,17 @@ export default async function BlogPostPage({ params }: Props) {
             {/* Article body */}
             <div className="px-8 py-6">
               <article
-                className="prose prose-slate prose-sm max-w-none
-                  prose-headings:font-bold prose-headings:text-slate-800
-                  prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3
-                  prose-p:text-slate-600 prose-p:leading-relaxed
-                  prose-li:text-slate-600 prose-strong:text-slate-800
-                  prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline"
+                className="prose prose-slate max-w-none
+                  prose-headings:font-bold prose-headings:text-slate-900
+                  prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h2:border-b prose-h2:border-slate-100 prose-h2:pb-2
+                  prose-h3:text-base prose-h3:font-semibold prose-h3:text-slate-800
+                  prose-p:text-slate-700 prose-p:leading-7 prose-p:text-base
+                  prose-li:text-slate-700 prose-li:leading-7
+                  prose-strong:text-slate-900 prose-strong:font-semibold
+                  prose-a:text-blue-700 prose-a:font-medium prose-a:no-underline hover:prose-a:underline
+                  prose-code:bg-slate-100 prose-code:text-slate-700 prose-code:px-1 prose-code:rounded prose-code:text-sm
+                  prose-blockquote:border-blue-400 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:rounded-r
+                  prose-ul:my-4 prose-ol:my-4"
                 dangerouslySetInnerHTML={{ __html: safeHtml }}
               />
             </div>

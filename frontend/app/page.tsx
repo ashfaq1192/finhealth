@@ -102,30 +102,33 @@ export default async function HomePage() {
         {/* Side panel */}
         <div className="lg:col-span-2 flex flex-col gap-4">
           {/* About card */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 flex-1">
-            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-3">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-2">
               What Is This?
             </p>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
               A daily composite score (0–100) measuring how favourable US economic
-              conditions are for small business funding. Powered by 6 Federal Reserve
-              indicators updated each morning.
+              conditions are for small business funding — powered by 6 Federal Reserve
+              indicators, refreshed every morning.
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-500">
+            <div className="space-y-2">
               {[
-                ["Prime Rate", "Borrowing cost"],
-                ["Yield Curve", "Credit signal"],
-                ["C&I Tightening", "Bank lending"],
-                ["Jobless Claims", "Labour market"],
-                ["Biz Applications", "Entrepreneur activity"],
-                ["Updated", "Daily 9 AM EST"],
-              ].map(([k, v]) => (
-                <div key={k} className="bg-slate-50 rounded-lg p-2">
-                  <div className="font-semibold text-slate-700">{k}</div>
-                  <div>{v}</div>
+                { label: "Prime Rate", desc: "Cost of borrowing", icon: "💵" },
+                { label: "Yield Curve", desc: "Credit market signal", icon: "📉" },
+                { label: "C&I Tightening", desc: "Bank lending standards", icon: "🏦" },
+                { label: "Jobless Claims", desc: "Labour market health", icon: "👷" },
+                { label: "Business Apps", desc: "Entrepreneur activity", icon: "📋" },
+              ].map(({ label, desc, icon }) => (
+                <div key={label} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
+                  <span className="text-base">{icon}</span>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-700">{label}</div>
+                    <div className="text-xs text-slate-400">{desc}</div>
+                  </div>
                 </div>
               ))}
             </div>
+            <p className="text-[11px] text-slate-400 mt-3 text-center">Updated daily · 9 AM EST</p>
           </div>
 
           {/* Today's industry focus */}
