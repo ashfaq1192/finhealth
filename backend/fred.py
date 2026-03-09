@@ -47,10 +47,52 @@ def _latest_value(observations: list[dict]) -> float | None:
     return None
 
 
+def _compute_cpi_yoy(api_key: str) -> "float | None":
+    """
+    Return CPI year-over-year % change from CPIAUCSL (monthly, SA).
+    Fetches 15 months to guarantee 13 valid values for YoY calculation.
+    Non-fatal — returns None on any failure.
+    """
+    try:
+        obs = _fetch_series("CPIAUCSL", api_key, limit=15)
+        values: list[float] = []
+        for o in obs:
+            v = o.get("value", ".")
+            if v not in (".", "", None):
+                try:
+                    values.append(float(v))
+                except ValueError:
+                    pass
+            if len(values) == 13:
+                break
+        if len(values) < 13:
+            print(f"[fred] CPI: only {len(values)} valid obs — skipping YoY.")
+            return None
+        # obs sorted desc → values[0] = latest, values[12] = 12 months ago
+        return round((values[0] / values[12] - 1) * 100, 2)
+    except Exception as exc:
+        print(f"[fred] CPI YoY fetch failed (non-fatal): {exc}")
+        return None
+
+
+def _fetch_nfib(api_key: str) -> "float | None":
+    """
+    Return latest NFIB Small Business Optimism Index (NFIBSCIB, monthly, SA).
+    Non-fatal — returns None on any failure.
+    """
+    try:
+        obs = _fetch_series("NFIBSCIB", api_key, limit=2)
+        return _latest_value(obs)
+    except Exception as exc:
+        print(f"[fred] NFIB fetch failed (non-fatal): {exc}")
+        return None
+
+
 def fetch_all_indicators() -> dict[str, Any]:
     """
-    Fetch all 6 FRED indicators and return a dict with their latest values.
-    Raises RuntimeError if any indicator cannot be fetched.
+    Fetch all 6 core FRED indicators and return a dict with their latest values.
+    Also attempts 2 optional context indicators: CPI YoY (CPIAUCSL) and NFIB (NFIBSCIB).
+    Raises RuntimeError only if a core indicator cannot be fetched.
     """
     api_key = os.environ["FRED_API_KEY"]
     result: dict[str, Any] = {}
@@ -94,11 +136,22 @@ def fetch_all_indicators() -> dict[str, Any]:
     else:
         result["busapp_trending_up"] = False
 
-    # Validate all required keys are present
+    # Validate all 6 core indicators are present
     required = set(SERIES.keys())
     missing = required - set(result.keys())
     if missing:
         raise RuntimeError(f"Could not fetch indicators: {missing}")
+
+    # Optional context indicators — logged but never fatal
+    cpi = _compute_cpi_yoy(api_key)
+    if cpi is not None:
+        result["cpi_yoy"] = cpi
+        print(f"[fred] CPI YoY: {cpi}%")
+
+    nfib = _fetch_nfib(api_key)
+    if nfib is not None:
+        result["nfib_optimism"] = nfib
+        print(f"[fred] NFIB Optimism: {nfib}")
 
     result["fetch_date"] = datetime.utcnow().date().isoformat()
     return result

@@ -30,7 +30,7 @@ const SCORE_COLORS: Record<string, string> = {
 async function getPost(slug: string) {
   const { data, error } = await supabase
     .from("blog_posts")
-    .select("date, title, slug, content, meta_description, category, score_id")
+    .select("date, title, slug, content, meta_description, category, score_id, hero_image_url")
     .eq("slug", slug)
     .single();
   if (error || !data) return null;
@@ -61,20 +61,70 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPost(slug);
   if (!post) return { title: "Post not found" };
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const canonicalUrl = `${siteUrl}/blog/${slug}`;
+  // Prefer uploaded hero image (direct URL); fall back to first markdown image (proxied)
+  const ogImage = post.hero_image_url || proxyImage(extractFirstImage(post.content), siteUrl);
+
   return {
     title: `${post.title} | US Business Funding Climate Score`,
     description: post.meta_description,
+    openGraph: {
+      title: post.title,
+      description: post.meta_description,
+      type: "article",
+      publishedTime: post.date,
+      url: canonicalUrl,
+      siteName: "US Business Funding Climate Score",
+      ...(ogImage
+        ? { images: [{ url: ogImage, width: 1200, height: 628, alt: post.title }] }
+        : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.meta_description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
   };
 }
 
-function sanitizeHtml(markdown: string): string {
+function sanitizeHtml(markdown: string, stripFirstImage = false): string {
   const html = marked.parse(markdown) as string;
-  const clean = sanitizeHtmlLib(html, {
-    allowedTags: sanitizeHtmlLib.defaults.allowedTags.concat(["h1", "h2", "h3"]),
-    allowedAttributes: { a: ["href", "target", "rel"], ...sanitizeHtmlLib.defaults.allowedAttributes },
+  let clean = sanitizeHtmlLib(html, {
+    allowedTags: sanitizeHtmlLib.defaults.allowedTags.concat(["h1", "h2", "h3", "img"]),
+    allowedAttributes: {
+      ...sanitizeHtmlLib.defaults.allowedAttributes,
+      // Override after spread so our entries take precedence
+      a: ["href", "target", "rel"],
+      img: ["src", "alt", "width", "height", "loading"],
+    },
+    allowedSchemesByTag: { img: ["https"] },
   });
   // Strip leading H1 — the title is already shown in the article header
-  return clean.replace(/^\s*<h1[^>]*>.*?<\/h1>\s*/i, "");
+  clean = clean
+    .replace(/^\s*<h1[^>]*>.*?<\/h1>\s*/i, "")
+    .replace(/^(\s*<p>\s*<\/p>\s*)+/, "");
+  // Strip the first image — shown separately as hero above the article
+  if (stripFirstImage) {
+    clean = clean
+      .replace(/<p>\s*<img\b[^>]*>\s*<\/p>/, "")
+      .replace(/<img\b[^>]*>/, "");
+  }
+  // Strip AI-generated word count lines ("The word count for this content is X words.")
+  clean = clean.replace(/<p>\s*[Tt]he word count for this content is \d[\d,]* words\.?\s*<\/p>/g, "");
+  return clean;
+}
+
+function extractFirstImage(markdown: string): string | null {
+  const match = markdown.match(/!\[.*?\]\((https:\/\/[^\s)]+)\)/);
+  return match ? match[1] : null;
+}
+
+function proxyImage(url: string | null, siteUrl = ""): string | null {
+  if (!url) return null;
+  return `${siteUrl}/api/img?url=${encodeURIComponent(url)}`;
 }
 
 function formatDate(iso: string): string {
@@ -98,11 +148,46 @@ export default async function BlogPostPage({ params }: Props) {
     getRelatedPosts(post.category, slug),
   ]);
 
-  const safeHtml = sanitizeHtml(post.content);
+  // Prefer uploaded hero image; fall back to first markdown image (proxied to avoid CORS/hotlink issues)
+  const heroSrc = post.hero_image_url || proxyImage(extractFirstImage(post.content));
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com"}/blog/${post.slug}`;
+
+  // Strip the first markdown image from content only when a hero is being shown
+  const safeHtml = sanitizeHtml(post.content, !!heroSrc);
   const categoryColor = CATEGORY_COLORS[post.category] ?? "bg-slate-100 text-slate-700 border-slate-200";
   const scoreColor = score ? (SCORE_COLORS[score.status_label] ?? "text-slate-700 bg-slate-50 border-slate-200") : "";
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.meta_description,
+    datePublished: post.date,
+    dateModified: post.date,
+    url: canonicalUrl,
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+    author: {
+      "@type": "Person",
+      name: "Ashfaq Ahmad",
+      url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com"}/about`,
+      jobTitle: "M.Phil Economics",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "US Business Funding Climate Score",
+      url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com",
+    },
+    articleSection: post.category,
+    keywords: `small business funding, ${post.category.toLowerCase()}, business loans, SBA loans, prime rate`,
+    ...(heroSrc ? { image: heroSrc } : {}),
+  };
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
@@ -123,8 +208,8 @@ export default async function BlogPostPage({ params }: Props) {
           </nav>
 
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            {/* Article header */}
-            <div className="px-8 pt-8 pb-6 border-b border-slate-100">
+            {/* Article header — title first for SEO keyword primacy */}
+            <div className="px-8 pt-8 pb-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className={`text-xs font-bold px-3 py-1 rounded-full border ${categoryColor}`}>
                   {post.category}
@@ -137,10 +222,20 @@ export default async function BlogPostPage({ params }: Props) {
               <p className="text-slate-500 mt-2 text-sm leading-relaxed">{post.meta_description}</p>
             </div>
 
-            {/* Ad slot */}
-            <div className="px-8 py-4 border-b border-slate-100">
-              <AdSlot visible slot="blog-post-top" />
-            </div>
+            {/* Hero image — after title so H1 keyword is indexed first */}
+            {heroSrc && (
+              <div className="w-full overflow-hidden bg-slate-100 border-t border-b border-slate-100" style={{ height: "340px" }}>
+                <img
+                  src={heroSrc}
+                  alt={post.title}
+                  className="w-full h-full object-cover object-center"
+                  loading="eager"
+                />
+              </div>
+            )}
+
+            {/* Divider shown only when there is no image */}
+            {!heroSrc && <div className="border-t border-slate-100" />}
 
             {/* Article body */}
             <div className="px-8 py-6">
@@ -148,22 +243,33 @@ export default async function BlogPostPage({ params }: Props) {
                 className="prose prose-slate max-w-none
                   prose-headings:font-bold prose-headings:text-slate-900
                   prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h2:border-b prose-h2:border-slate-100 prose-h2:pb-2
-                  prose-h3:text-base prose-h3:font-semibold prose-h3:text-slate-800
+                  prose-h3:text-base prose-h3:font-semibold prose-h3:text-slate-800 prose-h3:mt-8 prose-h3:mb-2 prose-h3:border-l-4 prose-h3:border-blue-400 prose-h3:pl-3 prose-h3:not-italic
                   prose-p:text-slate-700 prose-p:leading-7 prose-p:text-base
                   prose-li:text-slate-700 prose-li:leading-7
                   prose-strong:text-slate-900 prose-strong:font-semibold
                   prose-a:text-blue-700 prose-a:font-medium prose-a:no-underline hover:prose-a:underline
                   prose-code:bg-slate-100 prose-code:text-slate-700 prose-code:px-1 prose-code:rounded prose-code:text-sm
                   prose-blockquote:border-blue-400 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:rounded-r
-                  prose-ul:my-4 prose-ol:my-4"
+                  prose-ul:my-4 prose-ol:my-4
+                  [&_p:empty]:hidden"
                 dangerouslySetInnerHTML={{ __html: safeHtml }}
               />
             </div>
 
-            {/* Bottom ad */}
-            <div className="px-8 pb-6">
+            {/* Ad slot — after article body */}
+            <div className="px-8 pb-6 border-t border-slate-100 pt-6">
               <AdSlot visible slot="blog-post-bottom" />
             </div>
+          </div>
+
+          {/* Admin edit link */}
+          <div className="mt-4 text-right">
+            <a
+              href={`/admin/edit/${post.slug}`}
+              className="text-[11px] text-slate-300 hover:text-slate-400 transition-colors"
+            >
+              ✏ Edit
+            </a>
           </div>
 
           {/* Related posts */}
@@ -242,5 +348,6 @@ export default async function BlogPostPage({ params }: Props) {
         </div>
       </div>
     </div>
+    </>
   );
 }

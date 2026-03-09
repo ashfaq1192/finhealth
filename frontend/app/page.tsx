@@ -6,18 +6,22 @@ import AdSlot from "@/components/AdSlot";
 import TrendChartWrapper from "@/components/TrendChartWrapper";
 import Link from "next/link";
 import TodaysFocus from "@/components/TodaysFocus";
+import FOMCCountdown from "@/components/FOMCCountdown";
+import EmailCapture from "@/components/EmailCapture";
 
 interface ScoreRow {
   date: string;
   health_score: number;
   status_label: string;
   reasoning: string[];
+  cpi_yoy?: number | null;
+  nfib_optimism?: number | null;
 }
 
 async function getLatestScore(): Promise<ScoreRow | null> {
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("date, health_score, status_label, reasoning")
+    .select("date, health_score, status_label, reasoning, cpi_yoy, nfib_optimism")
     .order("date", { ascending: false })
     .limit(1)
     .single();
@@ -116,7 +120,7 @@ export default async function HomePage() {
                 { label: "Prime Rate", desc: "Cost of borrowing", icon: "💵" },
                 { label: "Yield Curve", desc: "Credit market signal", icon: "📉" },
                 { label: "C&I Tightening", desc: "Bank lending standards", icon: "🏦" },
-                { label: "Jobless Claims", desc: "Labour market health", icon: "👷" },
+                { label: "Jobless Claims", desc: "Labor market health", icon: "👷" },
                 { label: "Business Apps", desc: "Entrepreneur activity", icon: "📋" },
               ].map(({ label, desc, icon }) => (
                 <div key={label} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
@@ -134,6 +138,9 @@ export default async function HomePage() {
           {/* Today's industry focus */}
           {latestPosts[0] && <TodaysFocus post={latestPosts[0]} />}
 
+          {/* FOMC countdown — high-value return-visit hook */}
+          <FOMCCountdown />
+
           {/* Ad slot */}
           <AdSlot visible={adVisible} slot="homepage-sidebar" />
         </div>
@@ -145,6 +152,67 @@ export default async function HomePage() {
           <TrendChartWrapper data={recentScores} />
         </div>
       )}
+
+      {/* CPI + NFIB context strip — shown once data is available from pipeline */}
+      {(latest?.cpi_yoy != null || latest?.nfib_optimism != null) && (
+        <div className={`grid grid-cols-1 gap-4 mb-6 ${latest?.cpi_yoy != null && latest?.nfib_optimism != null ? "sm:grid-cols-2" : ""}`}>
+          {latest?.cpi_yoy != null && (
+            <div className={`rounded-2xl border p-5 ${
+              latest.cpi_yoy > 4 ? "bg-red-50 border-red-200" :
+              latest.cpi_yoy > 2 ? "bg-amber-50 border-amber-200" :
+              "bg-green-50 border-green-200"
+            }`}>
+              <p className="text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2">
+                US Inflation (CPI)
+              </p>
+              <div className={`text-3xl font-black leading-none mb-1 ${
+                latest.cpi_yoy > 4 ? "text-red-700" :
+                latest.cpi_yoy > 2 ? "text-amber-700" :
+                "text-green-700"
+              }`}>
+                {latest.cpi_yoy.toFixed(1)}%
+              </div>
+              <div className="text-sm font-semibold">Year-over-Year</div>
+              <div className="text-xs opacity-60 mt-1">
+                Fed target: 2.0% ·{" "}
+                {latest.cpi_yoy > 4 ? "Well above target — rates stay elevated"
+                  : latest.cpi_yoy > 2 ? "Above target — Fed remains cautious"
+                  : "Near target — easing conditions possible"}
+              </div>
+            </div>
+          )}
+          {latest?.nfib_optimism != null && (
+            <div className={`rounded-2xl border p-5 ${
+              latest.nfib_optimism < 90 ? "bg-red-50 border-red-200" :
+              latest.nfib_optimism < 98 ? "bg-amber-50 border-amber-200" :
+              "bg-green-50 border-green-200"
+            }`}>
+              <p className="text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2">
+                NFIB Small Biz Optimism
+              </p>
+              <div className={`text-3xl font-black leading-none mb-1 ${
+                latest.nfib_optimism < 90 ? "text-red-700" :
+                latest.nfib_optimism < 98 ? "text-amber-700" :
+                "text-green-700"
+              }`}>
+                {latest.nfib_optimism.toFixed(1)}
+              </div>
+              <div className="text-sm font-semibold">Monthly Survey</div>
+              <div className="text-xs opacity-60 mt-1">
+                Neutral baseline: 98 ·{" "}
+                {latest.nfib_optimism < 90 ? "Owners are pessimistic"
+                  : latest.nfib_optimism < 98 ? "Below average confidence"
+                  : "Owners are optimistic"}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Email digest capture */}
+      <div className="mb-6">
+        <EmailCapture />
+      </div>
 
       {/* Latest analysis */}
       {latestPosts.length > 0 && (

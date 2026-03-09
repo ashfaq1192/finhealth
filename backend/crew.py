@@ -6,15 +6,21 @@ Pipeline:
   1. Fetch FRED indicators (fred.py)
   2. Calculate score (scoring.py)
   3. Generate reasoning bullets + blog post (CrewAI + Groq)
-  4. Upsert results to Supabase (daily_scores + blog_posts tables)
+  4. Polish blog post through Chief Editor agent (CrewAI + Groq)
+  5. Upsert results to Supabase (daily_scores + blog_posts tables)
 
 Exits with code 1 on full failure (triggers GitHub Actions failure notification).
 """
 
 import json
 import os
+import re
 import sys
+import time
 from datetime import datetime, timezone
+from typing import Any, Callable, TypeVar
+
+_T = TypeVar("_T")
 
 from json_repair import repair_json
 
@@ -28,7 +34,65 @@ from scoring import calculate_score
 from tasks import build_tasks, get_todays_category
 
 from crewai import Crew, Process
-from agents import data_fetcher_agent, economist_agent, writer_agent
+from agents import data_fetcher_agent, economist_agent, writer_agent, editor_agent
+from digest import send_daily_digest
+
+
+def _truncate_meta(text: str, max_len: int = 150) -> str:
+    """Truncate meta description at a natural boundary — never mid-clause."""
+    text = text.strip()
+    if len(text) <= max_len:
+        # Still ensure it ends on a complete sentence if possible
+        for punct in (".", "!", "?"):
+            if text.endswith(punct):
+                return text
+        # Ends mid-clause even within limit — find last sentence end
+        for punct in (". ", "! ", "? "):
+            idx = text.rfind(punct)
+            if idx > 60:
+                return text[: idx + 1]
+        return text
+
+    candidate = text[:max_len]
+    # 1. Prefer full sentence boundary
+    for punct in (". ", "! ", "? "):
+        idx = candidate.rfind(punct)
+        if idx > 60:
+            return candidate[: idx + 1]
+    # 2. Fall back to last comma (still a natural pause)
+    idx = candidate.rfind(", ")
+    if idx > 80:
+        return candidate[:idx] + "."
+    # 3. Last resort: word boundary at 130 chars (conservative)
+    short = text[:130]
+    idx = short.rfind(" ")
+    return short[:idx] + "." if idx > 60 else short
+
+
+def _retry(fn: Callable[[], _T], *, attempts: int, delays: list[int], label: str) -> _T:
+    """
+    Call fn() up to `attempts` times with progressive delays between failures.
+
+    delays: seconds to wait before each subsequent attempt (len == attempts - 1).
+            The last delay is reused if fewer delays are provided than needed.
+
+    Raises the last exception if every attempt fails.
+    """
+    last_exc: Exception | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as exc:
+            last_exc = exc
+            if i < attempts - 1:
+                wait = delays[min(i, len(delays) - 1)]
+                print(
+                    f"[retry] {label} — attempt {i + 1}/{attempts} failed: {exc}. "
+                    f"Retrying in {wait}s...",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+    raise last_exc  # type: ignore[misc]
 
 
 def _parse_json_output(raw: str) -> dict | list:
@@ -59,13 +123,19 @@ def run() -> int:
     today = datetime.now(timezone.utc).date().isoformat()
     print(f"[crew] Starting pipeline for {today}")
 
-    # Step 1: Fetch FRED indicators
+    # Step 1: Fetch FRED indicators — 3 attempts, 10s / 30s gaps
+    # FRED is a public government API; occasional 503s or slow responses are the typical failure.
     try:
-        indicators = fetch_all_indicators()
+        indicators = _retry(
+            fetch_all_indicators,
+            attempts=3,
+            delays=[10, 30],
+            label="FRED fetch",
+        )
         print(f"[crew] FRED indicators fetched: dprime={indicators['dprime']}, "
               f"t10y2y={indicators['t10y2y']}, icsa={indicators['icsa']}")
     except Exception as exc:
-        print(f"[crew] FATAL: Could not fetch FRED indicators: {exc}", file=sys.stderr)
+        print(f"[crew] FATAL: Could not fetch FRED indicators after 3 attempts: {exc}", file=sys.stderr)
         return 1
 
     # Step 2: Calculate score (pure function — no LLM needed)
@@ -81,30 +151,44 @@ def run() -> int:
     score_json = json.dumps(score_result, indent=2)
 
     # Step 3: Run CrewAI for reasoning bullets + blog post
+    # 3 attempts with 60s / 120s gaps — Groq free-tier rate limits reset in ~60s windows.
+    # Each retry builds a completely fresh Crew + Task objects so no stale state is carried over.
     try:
-        fetch_task, economist_task, writer_task = build_tasks(indicators_json, score_json)
+        _crew_result: dict[str, Any] = {}
 
-        crew = Crew(
-            agents=[data_fetcher_agent, economist_agent, writer_agent],
-            tasks=[fetch_task, economist_task, writer_task],
-            process=Process.sequential,
-            verbose=False,
-        )
-        result = crew.kickoff()
+        def _kickoff_crew() -> None:
+            ft, et, wt, edt = build_tasks(indicators_json, score_json)
+            c = Crew(
+                agents=[data_fetcher_agent, economist_agent, writer_agent, editor_agent],
+                tasks=[ft, et, wt, edt],
+                process=Process.sequential,
+                verbose=False,
+            )
+            _crew_result["output"] = c.kickoff()
+            _crew_result["tasks"] = (ft, et, wt, edt)
+
+        _retry(_kickoff_crew, attempts=3, delays=[60, 120], label="CrewAI/Groq kickoff")
+
+        result = _crew_result["output"]
+        fetch_task, economist_task, writer_task, editor_task = _crew_result["tasks"]
 
         # In CrewAI 1.x, task outputs are in result.tasks_output list
         tasks_output = getattr(result, "tasks_output", [])
         economist_output = tasks_output[1].raw if len(tasks_output) > 1 else ""
         writer_output = tasks_output[2].raw if len(tasks_output) > 2 else ""
+        editor_output = tasks_output[3].raw if len(tasks_output) > 3 else ""
 
         # Fallback: try direct task.output attribute (older CrewAI compat)
         if not economist_output:
             economist_output = getattr(getattr(economist_task, "output", None), "raw", "") or ""
         if not writer_output:
             writer_output = getattr(getattr(writer_task, "output", None), "raw", "") or ""
+        if not editor_output:
+            editor_output = getattr(getattr(editor_task, "output", None), "raw", "") or ""
 
         print(f"[crew] Economist output preview: {economist_output[:120]}")
         print(f"[crew] Writer output preview: {writer_output[:120]}")
+        print(f"[crew] Editor output preview: {editor_output[:120]}")
 
         # Parse reasoning bullets from economist task output
         try:
@@ -121,12 +205,20 @@ def run() -> int:
                 f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labour market health.",
             ]
 
-        # Parse blog post from writer task output
-        try:
-            post_data = _parse_json_output(writer_output)
-        except Exception as exc:
-            print(f"[crew] WARNING: Could not parse blog post JSON: {exc}", file=sys.stderr)
-            post_data = None
+        # Parse blog post from editor output (preferred), fall back to writer output
+        post_data = None
+        if editor_output:
+            try:
+                post_data = _parse_json_output(editor_output)
+                print("[crew] Using editor-polished blog post.")
+            except Exception as exc:
+                print(f"[crew] WARNING: Could not parse editor output: {exc}", file=sys.stderr)
+        if post_data is None and writer_output:
+            try:
+                post_data = _parse_json_output(writer_output)
+                print("[crew] Fallback: using raw writer output (editor parse failed).")
+            except Exception as exc:
+                print(f"[crew] WARNING: Could not parse writer output either: {exc}", file=sys.stderr)
 
     except Exception as exc:
         print(f"[crew] CrewAI pipeline error: {exc}", file=sys.stderr)
@@ -137,6 +229,15 @@ def run() -> int:
             f"Weekly jobless claims at {indicators['icsa']:,} reflect labour market health.",
         ]
         post_data = None
+
+    # Step 3a: Strip AI-generated word count line before saving (safety net)
+    if post_data:
+        raw_content = post_data.get("content", "")
+        post_data["content"] = re.sub(
+            r"\n*[Tt]he word count for this content is \d[\d,]* words\.?\s*$",
+            "",
+            raw_content,
+        ).rstrip()
 
     # Step 4: Upsert to Supabase
     supabase = create_client(
@@ -159,24 +260,31 @@ def run() -> int:
             "icsa": int(indicators["icsa"]),
             "busappwnsaus": int(indicators["busappwnsaus"]),
             "busapp_trending_up": indicators.get("busapp_trending_up", False),
+            # Optional context indicators — None if FRED fetch failed
+            "cpi_yoy": indicators.get("cpi_yoy"),
+            "nfib_optimism": indicators.get("nfib_optimism"),
             "updated_at": now_iso,
         }
-        supabase.table("daily_scores").upsert(score_row, on_conflict="date").execute()
+        _retry(
+            lambda: supabase.table("daily_scores").upsert(score_row, on_conflict="date").execute(),
+            attempts=3,
+            delays=[5, 15],
+            label="Supabase score upsert",
+        )
         print(f"[crew] Score upserted to daily_scores for {today}")
         score_saved = True
     except Exception as exc:
-        print(f"[crew] ERROR: Failed to save score: {exc}", file=sys.stderr)
+        print(f"[crew] ERROR: Failed to save score after 3 attempts: {exc}", file=sys.stderr)
 
     post_saved = False
     if post_data and score_saved:
         try:
             # Fetch the score record id
-            score_resp = (
-                supabase.table("daily_scores")
-                .select("id")
-                .eq("date", today)
-                .single()
-                .execute()
+            score_resp = _retry(
+                lambda: supabase.table("daily_scores").select("id").eq("date", today).single().execute(),
+                attempts=3,
+                delays=[5, 15],
+                label="Supabase score id fetch",
             )
             score_id = score_resp.data["id"]
 
@@ -186,16 +294,21 @@ def run() -> int:
                 "title": post_data.get("title", f"Business Funding Climate: {today}"),
                 "slug": post_data.get("slug", f"{today}-{get_todays_category().lower().replace(' ', '-')}"),
                 "content": post_data.get("content", ""),
-                "meta_description": post_data.get("meta_description", "")[:160],
+                "meta_description": _truncate_meta(post_data.get("meta_description", "")),
                 "category": get_todays_category(),
                 "score_id": score_id,
                 "updated_at": now_iso,
             }
-            supabase.table("blog_posts").upsert(post_row, on_conflict="date").execute()
+            _retry(
+                lambda: supabase.table("blog_posts").upsert(post_row, on_conflict="date").execute(),
+                attempts=3,
+                delays=[5, 15],
+                label="Supabase blog post upsert",
+            )
             print(f"[crew] Blog post upserted to blog_posts for {today}")
             post_saved = True
         except Exception as exc:
-            print(f"[crew] ERROR: Failed to save blog post: {exc}", file=sys.stderr)
+            print(f"[crew] ERROR: Failed to save blog post after 3 attempts: {exc}", file=sys.stderr)
 
     # Determine exit code
     if not score_saved:
@@ -207,6 +320,37 @@ def run() -> int:
 
     print(f"[crew] Pipeline complete. Score={score_result['health_score']} "
           f"({score_result['status_label']}), BlogPost={'saved' if post_saved else 'failed'}")
+
+    # Step 5: Send daily email digest to subscribers (non-fatal)
+    if score_saved:
+        try:
+            subs_resp = _retry(
+                lambda: supabase.table("subscribers")
+                    .select("email, unsubscribe_token")
+                    .eq("confirmed", True)
+                    .execute(),
+                attempts=2,
+                delays=[5],
+                label="Supabase subscribers fetch",
+            )
+            subscribers = subs_resp.data or []
+            site_url = os.environ.get("SITE_URL", "https://yourdomain.com")
+            post_title = post_data.get("title", "Today's Funding Analysis") if post_data else "Today's Funding Analysis"
+            post_url = f"{site_url}/blog/{post_data.get('slug', '')}" if post_data else site_url
+            send_daily_digest(
+                score=score_result["health_score"],
+                label=score_result["status_label"],
+                reasoning=reasoning,
+                post_title=post_title,
+                post_url=post_url,
+                cpi_yoy=indicators.get("cpi_yoy"),
+                nfib_optimism=indicators.get("nfib_optimism"),
+                site_url=site_url,
+                subscribers=subscribers,
+            )
+        except Exception as exc:
+            print(f"[crew] Email digest failed (non-fatal): {exc}", file=sys.stderr)
+
     return 0
 
 
