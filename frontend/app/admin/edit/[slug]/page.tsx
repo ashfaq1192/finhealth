@@ -1,10 +1,10 @@
-export const runtime = "edge";
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+
+export const runtime = "edge";
 
 interface PostFields {
   title: string;
