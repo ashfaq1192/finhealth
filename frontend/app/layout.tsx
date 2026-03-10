@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "US Business Funding Climate Score",
   description:
     "Daily AI-generated indicator of US small business funding conditions, powered by FRED economic data.",
+  other: {
+    "google-adsense-account": "ca-pub-9488224992325074",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
