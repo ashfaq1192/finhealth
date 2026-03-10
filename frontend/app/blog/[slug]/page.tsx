@@ -7,6 +7,7 @@ import { marked } from "marked";
 import sanitizeHtmlLib from "sanitize-html";
 import Link from "next/link";
 import type { Metadata } from "next";
+import EditButton from "@/components/EditButton";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -262,15 +263,8 @@ export default async function BlogPostPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Admin edit link */}
-          <div className="mt-4 text-right">
-            <a
-              href={`/admin/edit/${post.slug}`}
-              className="text-[11px] text-slate-300 hover:text-slate-400 transition-colors"
-            >
-              ✏ Edit
-            </a>
-          </div>
+          {/* Admin edit link — only visible when logged in as admin */}
+          <EditButton slug={post.slug} />
 
           {/* Related posts */}
           {relatedPosts.length > 0 && (

@@ -69,6 +69,12 @@ export default function AdminEditPage() {
     if (!secret.trim()) return;
     sessionStorage.setItem("admin_secret", secret);
     setAuthed(true);
+    // Set httpOnly cookie so EditButton appears on blog posts for 7 days
+    fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret }),
+    }).catch(() => {});
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {

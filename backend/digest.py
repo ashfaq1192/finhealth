@@ -22,7 +22,7 @@ import requests
 #
 # Once you verify your domain in Resend dashboard → Domains:
 #   Change to: "Funding Score <digest@yourdomain.com>"
-_FROM = "US Funding Score <onboarding@resend.dev>"
+_FROM = "US Funding Climate <digest@usfundingclimate.com>"
 # ─────────────────────────────────────────────────────────────────────────────
 
 _RESEND_URL = "https://api.resend.com/emails"
@@ -220,6 +220,7 @@ def send_daily_digest(
                 json={
                     "from": _FROM,
                     "to": email,
+                    "reply_to": "info@usfundingclimate.com",
                     "subject": subject,
                     "html": html,
                     "headers": {
