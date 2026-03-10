@@ -195,14 +195,17 @@ def run() -> int:
             reasoning = _parse_json_output(economist_output)
             if not isinstance(reasoning, list):
                 reasoning = [str(reasoning)]
-            reasoning = reasoning[:3]
-            while len(reasoning) < 3:
+            reasoning = reasoning[:6]
+            while len(reasoning) < 6:
                 reasoning.append("Economic conditions are being monitored.")
         except Exception:
             reasoning = [
-                f"Prime rate stands at {indicators['dprime']}%, affecting borrowing costs.",
-                f"Treasury yield spread at {indicators['t10y2y']}% signals credit conditions.",
+                f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",
+                f"Treasury yield spread at {indicators['t10y2y']}% signals credit market conditions.",
                 f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labour market health.",
+                f"C&I tightening for large firms at {indicators['drtscilm']}% tightens overall credit supply.",
+                f"C&I tightening for small firms at {indicators['drtscis']}% directly constrains small business lending.",
+                f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",
             ]
 
         # Parse blog post from editor output (preferred), fall back to writer output
@@ -224,9 +227,12 @@ def run() -> int:
         print(f"[crew] CrewAI pipeline error: {exc}", file=sys.stderr)
         # Continue — score can be saved without the blog post
         reasoning = [
-            f"Prime rate stands at {indicators['dprime']}%, affecting borrowing costs.",
-            f"Treasury yield spread at {indicators['t10y2y']}% signals credit conditions.",
-            f"Weekly jobless claims at {indicators['icsa']:,} reflect labour market health.",
+            f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",
+            f"Treasury yield spread at {indicators['t10y2y']}% signals credit market conditions.",
+            f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labour market health.",
+            f"C&I tightening for large firms at {indicators['drtscilm']}% tightens overall credit supply.",
+            f"C&I tightening for small firms at {indicators['drtscis']}% directly constrains small business lending.",
+            f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",
         ]
         post_data = None
 

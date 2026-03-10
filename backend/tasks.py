@@ -123,22 +123,24 @@ def build_tasks(indicators_json: str, score_json: str) -> tuple[Task, Task, Task
     economist_task = Task(
         description=(
             f"Using the scoring results for {today}:\n\n{score_json}\n\n"
-            "Write exactly THREE reasoning bullets for the Business Funding Climate Score. "
+            "Write exactly SIX reasoning bullets for the Business Funding Climate Score. "
             "CRITICAL RULES:\n"
             "- Each bullet MUST explain WHY an indicator is moving and what mechanism "
             "  connects it to small business credit access — not just WHAT it is doing.\n"
+            "- Cover all six FRED indicators across the six bullets (prime rate, yield curve, "
+            "  C&I tightening large firms, C&I tightening small firms, jobless claims, business apps).\n"
             "- Never repeat the same observation in different words across bullets.\n"
             "- Always include the actual numeric value with its unit (%, basis points, etc.).\n"
-            "- Each bullet is one sentence of max 25 words.\n\n"
+            "- Each bullet is one sentence of max 30 words.\n\n"
             "GOOD example: 'The prime rate at 8.5% — 350 basis points above its 5-year "
             "average — is raising variable-rate loan costs for small businesses that lack "
             "fixed-rate alternatives.'\n"
             "BAD example: 'Lenders are becoming more cautious about lending to businesses.'\n\n"
-            "Format: a JSON array of exactly 3 strings."
+            "Format: a JSON array of exactly 6 strings."
         ),
         expected_output=(
-            'A JSON array of exactly 3 strings, each a specific causal sentence with '
-            'indicator values and units, e.g. ["Bullet 1.", "Bullet 2.", "Bullet 3."]'
+            'A JSON array of exactly 6 strings, each a specific causal sentence with '
+            'indicator values and units, e.g. ["Bullet 1.", "Bullet 2.", "Bullet 3.", "Bullet 4.", "Bullet 5.", "Bullet 6."]'
         ),
         agent=economist_agent,
     )
