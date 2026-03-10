@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 // ─────────────────────────────────────────────────────────────────────────────
 const AUTHOR_NAME = "M. Ashfaq";
 const AUTHOR_TITLE = "M.Phil Economics";
-const AUTHOR_EMAIL = "ashfaqahmed1192@gmail.com";
+const AUTHOR_EMAIL = "info@usfundingclimate.com";
 const MPHIL_FOCUS = "South Asian Agriculture R&D Expenditures";
 // ─────────────────────────────────────────────────────────────────────────────
 
