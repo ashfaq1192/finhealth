@@ -3,6 +3,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Disclaimer from "@/components/Disclaimer";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "US Business Funding Climate Score",
@@ -22,6 +23,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Disclaimer />
       </body>
       <GoogleAnalytics gaId="G-XH1EHWGZBX" />
+      <Script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9488224992325074"
+        crossOrigin="anonymous"
+        strategy="afterInteractive"
+      />
     </html>
   );
 }
