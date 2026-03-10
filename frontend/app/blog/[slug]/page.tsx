@@ -8,6 +8,9 @@ import sanitizeHtmlLib from "sanitize-html";
 import Link from "next/link";
 import type { Metadata } from "next";
 import EditButton from "@/components/EditButton";
+import ShareButtons from "@/components/ShareButtons";
+import EmailCapture from "@/components/EmailCapture";
+import BackToTop from "@/components/BackToTop";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -189,6 +192,7 @@ export default async function BlogPostPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <BackToTop />
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
@@ -257,10 +261,20 @@ export default async function BlogPostPage({ params }: Props) {
               />
             </div>
 
+            {/* Share buttons */}
+            <div className="px-8 pb-6 border-t border-slate-100 pt-5">
+              <ShareButtons url={canonicalUrl} title={post.title} />
+            </div>
+
             {/* Ad slot — after article body */}
             <div className="px-8 pb-6 border-t border-slate-100 pt-6">
               <AdSlot visible slot="blog-post-bottom" />
             </div>
+          </div>
+
+          {/* Email capture — highest converting in-post placement */}
+          <div className="mt-4">
+            <EmailCapture />
           </div>
 
           {/* Admin edit link — only visible when logged in as admin */}
