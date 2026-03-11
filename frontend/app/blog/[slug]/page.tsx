@@ -265,11 +265,11 @@ export default async function BlogPostPage({ params }: Props) {
             <div className="px-8 pb-6 border-t border-slate-100 pt-5">
               <ShareButtons url={canonicalUrl} title={post.title} />
             </div>
+          </div>
 
-            {/* Ad slot — after article body */}
-            <div className="px-8 pb-6 border-t border-slate-100 pt-6">
-              <AdSlot visible slot="blog-post-bottom" />
-            </div>
+          {/* Ad slot — outside card so empty placeholder doesn't create blank space inside */}
+          <div className="mt-4">
+            <AdSlot visible slot="blog-post-bottom" />
           </div>
 
           {/* Email capture — highest converting in-post placement */}
