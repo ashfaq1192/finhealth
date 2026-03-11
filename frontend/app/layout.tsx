@@ -21,14 +21,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <main className="flex-1">{children}</main>
         <Disclaimer />
+        <GoogleAnalytics gaId="G-XH1EHWGZBX" />
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9488224992325074"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </body>
-      <GoogleAnalytics gaId="G-XH1EHWGZBX" />
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9488224992325074"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
     </html>
   );
 }
