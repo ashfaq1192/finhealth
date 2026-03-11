@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getPost(slug);
   if (!post) return { title: "Post not found" };
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
   const canonicalUrl = `${siteUrl}/blog/${slug}`;
   // Prefer uploaded hero image (direct URL); fall back to first markdown image (proxied)
   const ogImage = post.hero_image_url || proxyImage(extractFirstImage(post.content), siteUrl);
@@ -154,7 +154,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   // Prefer uploaded hero image; fall back to first markdown image (proxied to avoid CORS/hotlink issues)
   const heroSrc = post.hero_image_url || proxyImage(extractFirstImage(post.content));
-  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com"}/blog/${post.slug}`;
+  const canonicalUrl = `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com").trim()}/blog/${post.slug}`;
 
   // Strip the first markdown image from content only when a hero is being shown
   const safeHtml = sanitizeHtml(post.content, !!heroSrc);
@@ -173,13 +173,13 @@ export default async function BlogPostPage({ params }: Props) {
     author: {
       "@type": "Person",
       name: "Ashfaq Ahmad",
-      url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com"}/about`,
+      url: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com").trim()}/about`,
       jobTitle: "M.Phil Economics",
     },
     publisher: {
       "@type": "Organization",
       name: "US Business Funding Climate Score",
-      url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com",
+      url: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com").trim(),
     },
     articleSection: post.category,
     keywords: `small business funding, ${post.category.toLowerCase()}, business loans, SBA loans, prime rate`,
