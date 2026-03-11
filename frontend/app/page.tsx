@@ -117,14 +117,14 @@ export default async function HomePage() {
             </p>
             <div className="space-y-2">
               {[
-                { label: "Prime Rate", desc: "Cost of borrowing", icon: "💵" },
-                { label: "Yield Curve", desc: "Credit market signal", icon: "📉" },
-                { label: "C&I Tightening", desc: "Bank lending standards", icon: "🏦" },
-                { label: "Jobless Claims", desc: "Labor market health", icon: "👷" },
-                { label: "Business Apps", desc: "Entrepreneur activity", icon: "📋" },
-              ].map(({ label, desc, icon }) => (
+                { label: "Prime Rate", desc: "Cost of borrowing", abbr: "PR" },
+                { label: "Yield Curve", desc: "Credit market signal", abbr: "YC" },
+                { label: "C&I Tightening", desc: "Bank lending standards", abbr: "CI" },
+                { label: "Jobless Claims", desc: "Labor market health", abbr: "JC" },
+                { label: "Business Apps", desc: "Entrepreneur activity", abbr: "BA" },
+              ].map(({ label, desc, abbr }) => (
                 <div key={label} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
-                  <span className="text-base">{icon}</span>
+                  <span className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 flex-shrink-0">{abbr}</span>
                   <div>
                     <div className="text-xs font-semibold text-slate-700">{label}</div>
                     <div className="text-xs text-slate-400">{desc}</div>
