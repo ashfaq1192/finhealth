@@ -1,7 +1,6 @@
 export const runtime = "edge";
 
 import { supabase } from "@/lib/supabase";
-import AdSlot from "@/components/AdSlot";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
 import sanitizeHtmlLib from "sanitize-html";
@@ -214,7 +213,7 @@ export default async function BlogPostPage({ params }: Props) {
 
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             {/* Article header — title first for SEO keyword primacy */}
-            <div className="px-8 pt-8 pb-6">
+            <div className="px-6 pt-6 pb-4">
               <div className="flex items-center gap-2 mb-4">
                 <span className={`text-xs font-bold px-3 py-1 rounded-full border ${categoryColor}`}>
                   {post.category}
@@ -243,7 +242,7 @@ export default async function BlogPostPage({ params }: Props) {
             {!heroSrc && <div className="border-t border-slate-100" />}
 
             {/* Article body */}
-            <div className="px-8 py-6">
+            <div className="px-6 py-5">
               <article
                 className="prose prose-slate max-w-none
                   prose-headings:font-bold prose-headings:text-slate-900
@@ -262,14 +261,9 @@ export default async function BlogPostPage({ params }: Props) {
             </div>
 
             {/* Share buttons */}
-            <div className="px-8 pb-6 border-t border-slate-100 pt-5">
+            <div className="px-6 pb-5 border-t border-slate-100 pt-4">
               <ShareButtons url={canonicalUrl} title={post.title} />
             </div>
-          </div>
-
-          {/* Ad slot — outside card so empty placeholder doesn't create blank space inside */}
-          <div className="mt-4">
-            <AdSlot visible slot="blog-post-bottom" />
           </div>
 
           {/* Email capture — highest converting in-post placement */}
@@ -309,10 +303,10 @@ export default async function BlogPostPage({ params }: Props) {
         </div>
 
         {/* Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-1 space-y-3">
           {/* Score context widget */}
           {score && (
-            <div className={`rounded-2xl border p-5 ${scoreColor}`}>
+            <div className={`rounded-2xl border p-4 ${scoreColor}`}>
               <p className="text-xs font-bold tracking-widest uppercase opacity-60 mb-2">
                 Score on this date
               </p>
@@ -337,7 +331,7 @@ export default async function BlogPostPage({ params }: Props) {
           </Link>
 
           {/* Browse by sector */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-3">
               Browse by sector
             </p>
