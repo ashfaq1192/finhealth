@@ -2,7 +2,6 @@ export const runtime = "edge";
 
 import { supabase } from "@/lib/supabase";
 import ScoreCard, { ScoreState } from "@/components/ScoreCard";
-import AdSlot from "@/components/AdSlot";
 import TrendChartWrapper from "@/components/TrendChartWrapper";
 import Link from "next/link";
 import TodaysFocus from "@/components/TodaysFocus";
@@ -106,7 +105,7 @@ export default async function HomePage() {
         {/* Side panel */}
         <div className="lg:col-span-2 flex flex-col gap-4">
           {/* About card */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
             <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-2">
               What Is This?
             </p>
@@ -140,24 +139,21 @@ export default async function HomePage() {
 
           {/* FOMC countdown — high-value return-visit hook */}
           <FOMCCountdown />
-
-          {/* Ad slot */}
-          <AdSlot visible={adVisible} slot="homepage-sidebar" />
         </div>
       </div>
 
       {/* Trend chart */}
       {recentScores.length > 1 && (
-        <div className="bg-white rounded-2xl border border-slate-200 px-6 pt-6 pb-4 mb-6">
+        <div className="bg-white rounded-2xl border border-slate-200 px-5 pt-5 pb-4 mb-5">
           <TrendChartWrapper data={recentScores} />
         </div>
       )}
 
       {/* CPI + NFIB context strip — shown once data is available from pipeline */}
       {(latest?.cpi_yoy != null || latest?.nfib_optimism != null) && (
-        <div className={`grid grid-cols-1 gap-4 mb-6 ${latest?.cpi_yoy != null && latest?.nfib_optimism != null ? "sm:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-3 mb-5 ${latest?.cpi_yoy != null && latest?.nfib_optimism != null ? "sm:grid-cols-2" : ""}`}>
           {latest?.cpi_yoy != null && (
-            <div className={`rounded-2xl border p-5 ${
+            <div className={`rounded-2xl border p-4 ${
               latest.cpi_yoy > 4 ? "bg-red-50 border-red-200" :
               latest.cpi_yoy > 2 ? "bg-amber-50 border-amber-200" :
               "bg-green-50 border-green-200"
@@ -182,7 +178,7 @@ export default async function HomePage() {
             </div>
           )}
           {latest?.nfib_optimism != null && (
-            <div className={`rounded-2xl border p-5 ${
+            <div className={`rounded-2xl border p-4 ${
               latest.nfib_optimism < 90 ? "bg-red-50 border-red-200" :
               latest.nfib_optimism < 98 ? "bg-amber-50 border-amber-200" :
               "bg-green-50 border-green-200"
@@ -216,7 +212,7 @@ export default async function HomePage() {
 
       {/* Latest analysis */}
       {latestPosts.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">
               Latest Analysis
