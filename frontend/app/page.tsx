@@ -114,19 +114,24 @@ export default async function HomePage() {
               conditions are for small business funding — powered by 6 Federal Reserve
               indicators, refreshed every morning.
             </p>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {[
-                { label: "Prime Rate", desc: "Cost of borrowing", abbr: "PR" },
-                { label: "Yield Curve", desc: "Credit market signal", abbr: "YC" },
-                { label: "C&I Tightening", desc: "Bank lending standards", abbr: "CI" },
-                { label: "Jobless Claims", desc: "Labor market health", abbr: "JC" },
-                { label: "Business Apps", desc: "Entrepreneur activity", abbr: "BA" },
-              ].map(({ label, desc, abbr }) => (
-                <div key={label} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
-                  <span className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 flex-shrink-0">{abbr}</span>
-                  <div>
+                { label: "Prime Rate", desc: "Daily benchmark for business loans", source: "FRED DPRIME", abbr: "PR" },
+                { label: "Yield Curve", desc: "Treasury 10Y-2Y spread indicator", source: "FRED T10Y2Y", abbr: "YC" },
+                { label: "C&I Tightening", desc: "Bank lending standards (large firms)", source: "FRED DRTSCILM", abbr: "CI" },
+                { label: "Jobless Claims", desc: "Weekly initial unemployment filings", source: "FRED ICSA", abbr: "JC" },
+                { label: "Business Apps", desc: "New business applications (seasonal)", source: "FRED BUSAPPWNSAUS", abbr: "BA" },
+                { label: "Treasury Spread", desc: "Long-term vs short-term rates", source: "Daily computed", abbr: "TS" },
+              ].map(({ label, desc, source, abbr }) => (
+                <div key={label} className="bg-slate-50 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 flex-shrink-0">{abbr}</span>
                     <div className="text-xs font-semibold text-slate-700">{label}</div>
-                    <div className="text-xs text-slate-400">{desc}</div>
+                  </div>
+                  <div className="ml-9 mt-0.5 flex items-center gap-2">
+                    <span className="text-xs text-slate-600">{desc}</span>
+                    <span className="text-[10px] text-slate-400">·</span>
+                    <span className="text-[10px] text-slate-400">{source}</span>
                   </div>
                 </div>
               ))}
