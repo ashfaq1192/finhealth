@@ -124,24 +124,65 @@ export default async function HomePage() {
               conditions are for small business funding — powered by 6 Federal Reserve
               indicators, refreshed every morning.
             </p>
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {[
-                { label: "Prime Rate", desc: "Daily benchmark for business loans", source: "FRED DPRIME", abbr: "PR" },
-                { label: "Yield Curve", desc: "Treasury 10Y-2Y spread indicator", source: "FRED T10Y2Y", abbr: "YC" },
-                { label: "C&I Tightening", desc: "Bank lending standards (large firms)", source: "FRED DRTSCILM", abbr: "CI" },
-                { label: "Jobless Claims", desc: "Weekly initial unemployment filings", source: "FRED ICSA", abbr: "JC" },
-                { label: "Business Apps", desc: "New business applications (seasonal)", source: "FRED BUSAPPWNSAUS", abbr: "BA" },
-                { label: "Treasury Spread", desc: "Long-term vs short-term rates", source: "Daily computed", abbr: "TS" },
-              ].map(({ label, desc, source, abbr }) => (
-                <div key={label} className="bg-slate-50 rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 flex-shrink-0">{abbr}</span>
-                    <div className="text-xs font-semibold text-slate-700">{label}</div>
-                  </div>
-                  <div className="ml-9 mt-0.5 flex items-center gap-2">
-                    <span className="text-xs text-slate-600">{desc}</span>
-                    <span className="text-[10px] text-slate-400">·</span>
-                    <span className="text-[10px] text-slate-400">{source}</span>
+                {
+                  label: "Prime Rate",
+                  desc: "Sets the floor on most variable-rate business loans and SBA 7(a) rates",
+                  impact: "Higher = costlier borrowing",
+                  dot: "bg-red-400",
+                  impactColor: "text-red-500",
+                  dir: "↑",
+                },
+                {
+                  label: "Yield Curve",
+                  desc: "10Y minus 2Y Treasury spread — inversion signals credit stress ahead",
+                  impact: "Negative = recession signal",
+                  dot: "bg-purple-400",
+                  impactColor: "text-purple-500",
+                  dir: "↓",
+                },
+                {
+                  label: "C&I Standards (Large)",
+                  desc: "% of banks tightening commercial loan standards for large firms",
+                  impact: "Higher = less credit available",
+                  dot: "bg-orange-400",
+                  impactColor: "text-orange-500",
+                  dir: "↑",
+                },
+                {
+                  label: "C&I Standards (Small)",
+                  desc: "% of banks tightening commercial loan standards for small firms",
+                  impact: "Higher = harder to qualify",
+                  dot: "bg-orange-300",
+                  impactColor: "text-orange-400",
+                  dir: "↑",
+                },
+                {
+                  label: "Jobless Claims",
+                  desc: "Weekly new unemployment filings — reflects labor market health",
+                  impact: "Higher = economic stress rising",
+                  dot: "bg-amber-400",
+                  impactColor: "text-amber-600",
+                  dir: "↑",
+                },
+                {
+                  label: "Business Applications",
+                  desc: "New business filings — leading indicator of entrepreneur confidence",
+                  impact: "Higher = opportunity signal",
+                  dot: "bg-green-400",
+                  impactColor: "text-green-600",
+                  dir: "↑",
+                },
+              ].map(({ label, desc, impact, dot, impactColor, dir }) => (
+                <div key={label} className="flex gap-3 items-start bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${dot}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-700 leading-snug">{label}</p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{desc}</p>
+                    <p className={`text-[10px] font-semibold mt-0.5 ${impactColor}`}>
+                      {dir} {impact}
+                    </p>
                   </div>
                 </div>
               ))}

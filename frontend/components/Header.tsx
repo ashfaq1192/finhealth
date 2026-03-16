@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NavLinks from "@/components/NavLinks";
 
 export default function Header() {
   return (
@@ -12,20 +13,7 @@ export default function Header() {
             Funding Climate Score
           </span>
         </Link>
-        <nav className="flex gap-5 text-sm font-medium text-slate-300">
-          <Link href="/" className="hover:text-white transition-colors">
-            Score
-          </Link>
-          <Link href="/blog" className="hover:text-white transition-colors">
-            Analysis
-          </Link>
-          <Link href="/methodology" className="hover:text-white transition-colors">
-            Methodology
-          </Link>
-          <Link href="/about" className="hover:text-white transition-colors">
-            About
-          </Link>
-        </nav>
+        <NavLinks />
       </div>
     </header>
   );
