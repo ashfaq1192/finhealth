@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: "Legal & Disclosures | US Business Funding Climate Score",
   description:
     "Financial disclaimer, affiliate disclosure, AI content policy, and privacy policy for the US Business Funding Climate Score.",
+  alternates: {
+    canonical: "/legal",
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

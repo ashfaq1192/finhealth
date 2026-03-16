@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: "Methodology | US Business Funding Climate Score",
   description:
     "Full transparency on how we calculate the US Business Funding Climate Score — exact FRED series IDs, indicator weights, scoring formula, and AI usage disclosure.",
+  alternates: {
+    canonical: "/methodology",
+  },
 };
 
 const INDICATORS = [

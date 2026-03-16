@@ -1,6 +1,13 @@
 export const runtime = "edge";
 
+import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "/",
+  },
+};
 import ScoreCard, { ScoreState } from "@/components/ScoreCard";
 import TrendChartWrapper from "@/components/TrendChartWrapper";
 import Link from "next/link";

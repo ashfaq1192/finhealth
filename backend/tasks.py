@@ -104,7 +104,6 @@ def build_tasks(indicators_json: str, score_json: str) -> tuple[Task, Task, Task
     today = datetime.utcnow().date().isoformat()
     category = get_todays_category()
     seo = CATEGORY_SEO[category]
-    slug = f"{today}-{category.lower().replace(' ', '-')}"
 
     fetch_task = Task(
         description=(
@@ -160,8 +159,7 @@ def build_tasks(indicators_json: str, score_json: str) -> tuple[Task, Task, Task
             f"They have 5 minutes. They scan before they read. They want facts, not reassurance.\n\n"
             f"INDUSTRY: {category}\n"
             f"PRIMARY KEYWORD: \"{seo['primary']}\"\n"
-            f"SECONDARY KEYWORDS: {seo['secondary']}\n"
-            f"SLUG: {slug}\n\n"
+            f"SECONDARY KEYWORDS: {seo['secondary']}\n\n"
             f"INDUSTRY CONTEXT:\n{seo['industry_context']}\n\n"
             f"SCORE DATA (use as supporting evidence, not the main topic):\n{score_json}\n\n"
             "CONTENT STRUCTURE — follow this exactly:\n"
@@ -243,7 +241,8 @@ def build_tasks(indicators_json: str, score_json: str) -> tuple[Task, Task, Task
             "- Do NOT advise the reader to borrow, invest, or take any financial action.\n\n"
             "OUTPUT: A single JSON object with exactly these keys:\n"
             "  title: string (SEO-optimized, evergreen, no date)\n"
-            "  slug: string (use the slug provided above exactly)\n"
+            "  slug: string (derived from the title — lowercase, hyphens only, no dates, "
+            "no stop words, max 60 chars, e.g. 'sba-loan-eligibility-tight-credit-conditions')\n"
             "  content: string (full markdown, 900+ words, NO H1, NO backticks, NO References)\n"
             "  meta_description: string — STRICT RULES: (1) exactly ONE complete sentence, "
             "(2) ends with a period, (3) includes the primary keyword, "
@@ -371,13 +370,14 @@ def build_tasks(indicators_json: str, score_json: str) -> tuple[Task, Task, Task
             "Output ONLY a valid JSON object. No preamble, no code fences, no commentary.\n"
             "The JSON must have EXACTLY these 4 keys in this order:\n"
             "  1. title         — evergreen, SEO-optimized, under 65 chars\n"
-            "  2. slug          — IDENTICAL to the writer's slug, do not alter\n"
+            "  2. slug          — keyword-rich, derived from title, lowercase, hyphens only, "
+            "no dates, max 60 chars (fix if writer's slug is poor)\n"
             "  3. meta_description — one sentence, ends with period, max 140 chars\n"
             "  4. content       — full markdown, 900-1100 words, ends at FAQ, no H1\n"
         ),
         expected_output=(
             "A valid JSON object with exactly 4 keys in this order: title "
-            "(evergreen, under 65 chars), slug (unchanged), meta_description "
+            "(evergreen, under 65 chars), slug (keyword-rich from title, no dates), meta_description "
             "(one sentence, period, primary keyword, max 140 chars), content "
             "(900-1100 word publication-ready evergreen markdown, ends after FAQ, no H1)."
         ),

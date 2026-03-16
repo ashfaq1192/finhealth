@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   title: "Small Business Funding Analysis | US Business Funding Climate Score",
   description:
     "Expert analysis of US small business funding conditions across trucking, retail, SBA loans, staffing, and macro sectors. Updated daily.",
+  alternates: {
+    canonical: "/blog",
+  },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {

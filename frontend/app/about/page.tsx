@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: "About | US Business Funding Climate Score",
   description:
     "The economist and AI engineer behind the US Business Funding Climate Score — a free daily tool that makes Federal Reserve data actionable for US small business owners.",
+  alternates: {
+    canonical: "/about",
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

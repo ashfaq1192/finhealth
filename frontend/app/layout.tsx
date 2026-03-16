@@ -6,9 +6,13 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import Script from "next/script";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://usfundingclimate.com"),
   title: "US Business Funding Climate Score",
   description:
     "Daily AI-generated indicator of US small business funding conditions, powered by FRED economic data.",
+  alternates: {
+    canonical: "/",
+  },
   other: {
     "google-adsense-account": "ca-pub-9488224992325074",
   },

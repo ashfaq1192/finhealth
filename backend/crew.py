@@ -295,10 +295,20 @@ def run() -> int:
             score_id = score_resp.data["id"]
 
             now_iso = datetime.now(timezone.utc).isoformat()
+            raw_slug = post_data.get("slug", "")
+            # Sanitize AI-generated slug: lowercase, hyphens only, no dates, max 80 chars
+            sanitized_slug = re.sub(r"[^a-z0-9-]", "", raw_slug.lower().replace(" ", "-"))
+            sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:80]
+            if not sanitized_slug:
+                title = post_data.get("title", "")
+                sanitized_slug = re.sub(r"[^a-z0-9-]", "", title.lower().replace(" ", "-"))
+                sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:80]
+            if not sanitized_slug:
+                sanitized_slug = f"{get_todays_category().lower().replace(' ', '-')}-funding-conditions"
             post_row = {
                 "date": today,
                 "title": post_data.get("title", f"Business Funding Climate: {today}"),
-                "slug": post_data.get("slug", f"{today}-{get_todays_category().lower().replace(' ', '-')}"),
+                "slug": sanitized_slug,
                 "content": post_data.get("content", ""),
                 "meta_description": _truncate_meta(post_data.get("meta_description", "")),
                 "category": get_todays_category(),
