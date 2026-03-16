@@ -33,8 +33,17 @@ export default function FOMCCountdown() {
     setNext(getNextFOMC());
   }, []);
 
-  // Renders nothing until hydrated — avoids SSR/client mismatch
-  if (!next) return null;
+  // Render a skeleton until hydrated so the grid column is always filled
+  if (!next) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 animate-pulse">
+        <div className="h-2.5 w-28 bg-slate-100 rounded mb-4" />
+        <div className="h-9 w-14 bg-slate-100 rounded mb-2" />
+        <div className="h-3 w-24 bg-slate-100 rounded mb-1" />
+        <div className="h-2.5 w-36 bg-slate-100 rounded" />
+      </div>
+    );
+  }
 
   const formatted = next.date.toLocaleDateString("en-US", {
     month: "short",

@@ -209,12 +209,11 @@ export default async function HomePage() {
         <FOMCCountdown />
       </div>
 
-      {/* ── 4. CPI + NFIB CONTEXT STRIP ── */}
+      {/* ── 4. CPI + NFIB CONTEXT STRIP ── always 2-col, placeholder when data absent */}
       {(latest?.cpi_yoy != null || latest?.nfib_optimism != null) && (
-        <div className={`grid grid-cols-1 gap-3 mb-5 ${
-          latest?.cpi_yoy != null && latest?.nfib_optimism != null ? "sm:grid-cols-2" : ""
-        }`}>
-          {latest?.cpi_yoy != null && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          {/* CPI */}
+          {latest?.cpi_yoy != null ? (
             <div className={`rounded-2xl border p-4 ${
               latest.cpi_yoy > 4 ? "bg-red-50 border-red-200" :
               latest.cpi_yoy > 2 ? "bg-amber-50 border-amber-200" :
@@ -240,8 +239,15 @@ export default async function HomePage() {
                   : "Near target — easing conditions possible"}
               </div>
             </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300 mb-2">US Inflation (CPI)</p>
+              <p className="text-xs text-slate-400">Fetched daily from FRED · updates with next pipeline run</p>
+            </div>
           )}
-          {latest?.nfib_optimism != null && (
+
+          {/* NFIB */}
+          {latest?.nfib_optimism != null ? (
             <div className={`rounded-2xl border p-4 ${
               latest.nfib_optimism < 90 ? "bg-red-50 border-red-200" :
               latest.nfib_optimism < 98 ? "bg-amber-50 border-amber-200" :
@@ -266,6 +272,11 @@ export default async function HomePage() {
                   ? "Below average confidence"
                   : "Owners are optimistic"}
               </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300 mb-2">NFIB Small Biz Optimism</p>
+              <p className="text-xs text-slate-400">Monthly survey · updates when FRED releases new data</p>
             </div>
           )}
         </div>
