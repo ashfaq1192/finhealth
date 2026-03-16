@@ -9,7 +9,6 @@ export const metadata: Metadata = {
   },
 };
 import ScoreCard, { ScoreState } from "@/components/ScoreCard";
-import TrendChartWrapper from "@/components/TrendChartWrapper";
 import Link from "next/link";
 import TodaysFocus from "@/components/TodaysFocus";
 import FOMCCountdown from "@/components/FOMCCountdown";
@@ -27,6 +26,14 @@ interface ScoreRow {
   dprime?: number | null;
 }
 
+interface PostRow {
+  date: string;
+  title: string;
+  slug: string;
+  category: string;
+  meta_description: string;
+}
+
 async function getLatestScore(): Promise<ScoreRow | null> {
   const { data, error } = await supabase
     .from("daily_scores")
@@ -38,17 +45,7 @@ async function getLatestScore(): Promise<ScoreRow | null> {
   return data as ScoreRow;
 }
 
-async function getRecentScores(): Promise<ScoreRow[]> {
-  const { data, error } = await supabase
-    .from("daily_scores")
-    .select("date, health_score, status_label, reasoning")
-    .order("date", { ascending: false })
-    .limit(30);
-  if (error || !data) return [];
-  return data as ScoreRow[];
-}
-
-async function getLatestPosts() {
+async function getLatestPosts(): Promise<PostRow[]> {
   const { data } = await supabase
     .from("blog_posts")
     .select("date, title, slug, category, meta_description")
@@ -80,28 +77,85 @@ function formatDate(iso: string): string {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Trucking: "bg-blue-100 text-blue-700",
-  Retail: "bg-purple-100 text-purple-700",
+  Trucking:    "bg-blue-100 text-blue-700",
+  Retail:      "bg-purple-100 text-purple-700",
   "SBA Loans": "bg-green-100 text-green-700",
-  Macro: "bg-slate-100 text-slate-700",
-  Staffing: "bg-orange-100 text-orange-700",
+  Macro:       "bg-slate-100 text-slate-700",
+  Staffing:    "bg-orange-100 text-orange-700",
 };
 
+const CATEGORY_BORDER: Record<string, string> = {
+  Trucking:    "border-l-blue-400",
+  Retail:      "border-l-purple-400",
+  "SBA Loans": "border-l-green-400",
+  Macro:       "border-l-slate-400",
+  Staffing:    "border-l-orange-400",
+};
+
+const INDICATORS = [
+  {
+    label: "Prime Rate",
+    desc: "Sets the floor on most variable-rate business loans and SBA 7(a) rates",
+    impact: "Higher = costlier borrowing",
+    dot: "bg-red-400",
+    impactColor: "text-red-500",
+    dir: "↑",
+  },
+  {
+    label: "Yield Curve",
+    desc: "10Y minus 2Y Treasury spread — inversion signals credit stress ahead",
+    impact: "Negative = recession signal",
+    dot: "bg-purple-400",
+    impactColor: "text-purple-500",
+    dir: "↓",
+  },
+  {
+    label: "C&I Standards (Large)",
+    desc: "% of banks tightening commercial loan standards for large firms",
+    impact: "Higher = less credit available",
+    dot: "bg-orange-400",
+    impactColor: "text-orange-500",
+    dir: "↑",
+  },
+  {
+    label: "C&I Standards (Small)",
+    desc: "% of banks tightening commercial loan standards for small firms",
+    impact: "Higher = harder to qualify",
+    dot: "bg-orange-300",
+    impactColor: "text-orange-400",
+    dir: "↑",
+  },
+  {
+    label: "Jobless Claims",
+    desc: "Weekly new unemployment filings — reflects labor market health",
+    impact: "Higher = economic stress rising",
+    dot: "bg-amber-400",
+    impactColor: "text-amber-600",
+    dir: "↑",
+  },
+  {
+    label: "Business Applications",
+    desc: "New business filings — leading indicator of entrepreneur confidence",
+    impact: "Higher = opportunity signal",
+    dot: "bg-green-400",
+    impactColor: "text-green-600",
+    dir: "↑",
+  },
+];
+
 export default async function HomePage() {
-  const [latest, recentScores, latestPosts] = await Promise.all([
+  const [latest, latestPosts] = await Promise.all([
     getLatestScore(),
-    getRecentScores(),
     getLatestPosts(),
   ]);
 
   const state = computeScoreState(latest);
-  const adVisible = state !== "unavailable" && state !== "cold-start";
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* Hero row */}
+
+      {/* ── 1. HERO ROW: Score + Indicators ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-        {/* Score card — wider */}
         <div className="lg:col-span-3">
           <ScoreCard
             score={latest?.health_score ?? null}
@@ -112,69 +166,18 @@ export default async function HomePage() {
           />
         </div>
 
-        {/* Side panel */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          {/* About card */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-2">
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 h-full">
+            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1">
               What Is This?
             </p>
             <p className="text-sm text-slate-600 leading-relaxed mb-4">
               A daily composite score (0–100) measuring how favourable US economic
               conditions are for small business funding — powered by 6 Federal Reserve
-              indicators, refreshed every morning.
+              indicators, updated every morning.
             </p>
             <div className="space-y-2">
-              {[
-                {
-                  label: "Prime Rate",
-                  desc: "Sets the floor on most variable-rate business loans and SBA 7(a) rates",
-                  impact: "Higher = costlier borrowing",
-                  dot: "bg-red-400",
-                  impactColor: "text-red-500",
-                  dir: "↑",
-                },
-                {
-                  label: "Yield Curve",
-                  desc: "10Y minus 2Y Treasury spread — inversion signals credit stress ahead",
-                  impact: "Negative = recession signal",
-                  dot: "bg-purple-400",
-                  impactColor: "text-purple-500",
-                  dir: "↓",
-                },
-                {
-                  label: "C&I Standards (Large)",
-                  desc: "% of banks tightening commercial loan standards for large firms",
-                  impact: "Higher = less credit available",
-                  dot: "bg-orange-400",
-                  impactColor: "text-orange-500",
-                  dir: "↑",
-                },
-                {
-                  label: "C&I Standards (Small)",
-                  desc: "% of banks tightening commercial loan standards for small firms",
-                  impact: "Higher = harder to qualify",
-                  dot: "bg-orange-300",
-                  impactColor: "text-orange-400",
-                  dir: "↑",
-                },
-                {
-                  label: "Jobless Claims",
-                  desc: "Weekly new unemployment filings — reflects labor market health",
-                  impact: "Higher = economic stress rising",
-                  dot: "bg-amber-400",
-                  impactColor: "text-amber-600",
-                  dir: "↑",
-                },
-                {
-                  label: "Business Applications",
-                  desc: "New business filings — leading indicator of entrepreneur confidence",
-                  impact: "Higher = opportunity signal",
-                  dot: "bg-green-400",
-                  impactColor: "text-green-600",
-                  dir: "↑",
-                },
-              ].map(({ label, desc, impact, dot, impactColor, dir }) => (
+              {INDICATORS.map(({ label, desc, impact, dot, impactColor, dir }) => (
                 <div key={label} className="flex gap-3 items-start bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                   <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${dot}`} />
                   <div className="min-w-0">
@@ -189,25 +192,28 @@ export default async function HomePage() {
             </div>
             <p className="text-[11px] text-slate-400 mt-3 text-center">Updated daily · 9 AM EST</p>
           </div>
-
-          {/* Today's industry focus */}
-          {latestPosts[0] && <TodaysFocus post={latestPosts[0]} />}
-
-          {/* FOMC countdown — high-value return-visit hook */}
-          <FOMCCountdown />
         </div>
       </div>
 
-      {/* Trend chart */}
-      {recentScores.length > 1 && (
-        <div className="bg-white rounded-2xl border border-slate-200 px-5 pt-5 pb-4 mb-5">
-          <TrendChartWrapper data={recentScores} />
-        </div>
-      )}
+      {/* ── 2. LOAN CLIMATE — most actionable, right below hero ── */}
+      <div className="mb-5">
+        <LoanClimatePanel
+          label={latest?.status_label ?? null}
+          score={latest?.health_score ?? null}
+        />
+      </div>
 
-      {/* CPI + NFIB context strip — shown once data is available from pipeline */}
+      {/* ── 3. TODAY'S FOCUS + FOMC COUNTDOWN ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+        {latestPosts[0] && <TodaysFocus post={latestPosts[0]} />}
+        <FOMCCountdown />
+      </div>
+
+      {/* ── 4. CPI + NFIB CONTEXT STRIP ── */}
       {(latest?.cpi_yoy != null || latest?.nfib_optimism != null) && (
-        <div className={`grid grid-cols-1 gap-3 mb-5 ${latest?.cpi_yoy != null && latest?.nfib_optimism != null ? "sm:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-3 mb-5 ${
+          latest?.cpi_yoy != null && latest?.nfib_optimism != null ? "sm:grid-cols-2" : ""
+        }`}>
           {latest?.cpi_yoy != null && (
             <div className={`rounded-2xl border p-4 ${
               latest.cpi_yoy > 4 ? "bg-red-50 border-red-200" :
@@ -227,8 +233,10 @@ export default async function HomePage() {
               <div className="text-sm font-semibold">Year-over-Year</div>
               <div className="text-xs opacity-60 mt-1">
                 Fed target: 2.0% ·{" "}
-                {latest.cpi_yoy > 4 ? "Well above target — rates stay elevated"
-                  : latest.cpi_yoy > 2 ? "Above target — Fed remains cautious"
+                {latest.cpi_yoy > 4
+                  ? "Well above target — rates stay elevated"
+                  : latest.cpi_yoy > 2
+                  ? "Above target — Fed remains cautious"
                   : "Near target — easing conditions possible"}
               </div>
             </div>
@@ -252,8 +260,10 @@ export default async function HomePage() {
               <div className="text-sm font-semibold">Monthly Survey</div>
               <div className="text-xs opacity-60 mt-1">
                 Neutral baseline: 98 ·{" "}
-                {latest.nfib_optimism < 90 ? "Owners are pessimistic"
-                  : latest.nfib_optimism < 98 ? "Below average confidence"
+                {latest.nfib_optimism < 90
+                  ? "Owners are pessimistic"
+                  : latest.nfib_optimism < 98
+                  ? "Below average confidence"
                   : "Owners are optimistic"}
               </div>
             </div>
@@ -261,24 +271,19 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Loan climate interpretation */}
-      <div className="mb-5">
-        <LoanClimatePanel label={latest?.status_label ?? null} score={latest?.health_score ?? null} />
-      </div>
-
-      {/* Prime rate impact calculator */}
+      {/* ── 5. PRIME RATE CALCULATOR ── */}
       {latest?.dprime != null && (
         <div className="mb-5">
           <PrimeRateCalculator primeRate={latest.dprime} />
         </div>
       )}
 
-      {/* Email digest capture */}
+      {/* ── 6. EMAIL CAPTURE ── */}
       <div className="mb-6">
         <EmailCapture />
       </div>
 
-      {/* Latest analysis */}
+      {/* ── 7. LATEST ANALYSIS ── */}
       {latestPosts.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -287,34 +292,39 @@ export default async function HomePage() {
             </p>
             <Link
               href="/blog"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
             >
               View all →
             </Link>
           </div>
-          <ul className="divide-y divide-slate-100">
-            {latestPosts.map((post) => (
-              <li key={post.slug} className="py-3 first:pt-0 last:pb-0">
-                <Link href={`/blog/${post.slug}`} className="group flex gap-3 items-start">
-                  <span
-                    className={`mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                      CATEGORY_COLORS[post.category] ?? "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {post.category}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors leading-snug">
-                      {post.title}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDate(post.date)}</p>
+          <div className="flex flex-col gap-3">
+            {latestPosts.map((post) => {
+              const borderColor = CATEGORY_BORDER[post.category] ?? "border-l-slate-300";
+              return (
+                <Link
+                  key={post.slug}
+                  href={`/blog/${post.slug}`}
+                  className={`block rounded-xl border border-slate-200 border-l-4 ${borderColor} bg-slate-50 hover:bg-white hover:shadow-sm transition-all group p-4`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${CATEGORY_COLORS[post.category] ?? "bg-slate-100 text-slate-600"}`}>
+                      {post.category}
+                    </span>
+                    <span className="text-xs text-slate-400">{formatDate(post.date)}</span>
                   </div>
+                  <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors leading-snug mb-1">
+                    {post.title}
+                  </p>
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                    {post.meta_description}
+                  </p>
                 </Link>
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
         </div>
       )}
+
     </div>
   );
 }
