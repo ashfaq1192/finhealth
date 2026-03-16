@@ -14,6 +14,8 @@ import Link from "next/link";
 import TodaysFocus from "@/components/TodaysFocus";
 import FOMCCountdown from "@/components/FOMCCountdown";
 import EmailCapture from "@/components/EmailCapture";
+import LoanClimatePanel from "@/components/LoanClimatePanel";
+import PrimeRateCalculator from "@/components/PrimeRateCalculator";
 
 interface ScoreRow {
   date: string;
@@ -22,12 +24,13 @@ interface ScoreRow {
   reasoning: string[];
   cpi_yoy?: number | null;
   nfib_optimism?: number | null;
+  dprime?: number | null;
 }
 
 async function getLatestScore(): Promise<ScoreRow | null> {
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("date, health_score, status_label, reasoning, cpi_yoy, nfib_optimism")
+    .select("date, health_score, status_label, reasoning, cpi_yoy, nfib_optimism, dprime")
     .order("date", { ascending: false })
     .limit(1)
     .single();
@@ -214,6 +217,18 @@ export default async function HomePage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Loan climate interpretation */}
+      <div className="mb-5">
+        <LoanClimatePanel label={latest?.status_label ?? null} score={latest?.health_score ?? null} />
+      </div>
+
+      {/* Prime rate impact calculator */}
+      {latest?.dprime != null && (
+        <div className="mb-5">
+          <PrimeRateCalculator primeRate={latest.dprime} />
         </div>
       )}
 
