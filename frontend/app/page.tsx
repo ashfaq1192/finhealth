@@ -15,6 +15,7 @@ import FOMCCountdown from "@/components/FOMCCountdown";
 import EmailCapture from "@/components/EmailCapture";
 import LoanClimatePanel from "@/components/LoanClimatePanel";
 import PrimeRateCalculator from "@/components/PrimeRateCalculator";
+import ContextStatsPanel from "@/components/ContextStatsPanel";
 
 interface ScoreRow {
   date: string;
@@ -209,78 +210,11 @@ export default async function HomePage() {
         <FOMCCountdown />
       </div>
 
-      {/* ── 4. CPI + NFIB CONTEXT STRIP ── always 2-col, placeholder when data absent */}
-      {(latest?.cpi_yoy != null || latest?.nfib_optimism != null) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-          {/* CPI */}
-          {latest?.cpi_yoy != null ? (
-            <div className={`rounded-2xl border p-4 ${
-              latest.cpi_yoy > 4 ? "bg-red-50 border-red-200" :
-              latest.cpi_yoy > 2 ? "bg-amber-50 border-amber-200" :
-              "bg-green-50 border-green-200"
-            }`}>
-              <p className="text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2">
-                US Inflation (CPI)
-              </p>
-              <div className={`text-3xl font-black leading-none mb-1 ${
-                latest.cpi_yoy > 4 ? "text-red-700" :
-                latest.cpi_yoy > 2 ? "text-amber-700" :
-                "text-green-700"
-              }`}>
-                {latest.cpi_yoy.toFixed(1)}%
-              </div>
-              <div className="text-sm font-semibold">Year-over-Year</div>
-              <div className="text-xs opacity-60 mt-1">
-                Fed target: 2.0% ·{" "}
-                {latest.cpi_yoy > 4
-                  ? "Well above target — rates stay elevated"
-                  : latest.cpi_yoy > 2
-                  ? "Above target — Fed remains cautious"
-                  : "Near target — easing conditions possible"}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300 mb-2">US Inflation (CPI)</p>
-              <p className="text-xs text-slate-400">Fetched daily from FRED · updates with next pipeline run</p>
-            </div>
-          )}
-
-          {/* NFIB */}
-          {latest?.nfib_optimism != null ? (
-            <div className={`rounded-2xl border p-4 ${
-              latest.nfib_optimism < 90 ? "bg-red-50 border-red-200" :
-              latest.nfib_optimism < 98 ? "bg-amber-50 border-amber-200" :
-              "bg-green-50 border-green-200"
-            }`}>
-              <p className="text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2">
-                NFIB Small Biz Optimism
-              </p>
-              <div className={`text-3xl font-black leading-none mb-1 ${
-                latest.nfib_optimism < 90 ? "text-red-700" :
-                latest.nfib_optimism < 98 ? "text-amber-700" :
-                "text-green-700"
-              }`}>
-                {latest.nfib_optimism.toFixed(1)}
-              </div>
-              <div className="text-sm font-semibold">Monthly Survey</div>
-              <div className="text-xs opacity-60 mt-1">
-                Neutral baseline: 98 ·{" "}
-                {latest.nfib_optimism < 90
-                  ? "Owners are pessimistic"
-                  : latest.nfib_optimism < 98
-                  ? "Below average confidence"
-                  : "Owners are optimistic"}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300 mb-2">NFIB Small Biz Optimism</p>
-              <p className="text-xs text-slate-400">Monthly survey · updates when FRED releases new data</p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── 4. CPI + NFIB CONTEXT STRIP ── animated client component */}
+      <ContextStatsPanel
+        cpi_yoy={latest?.cpi_yoy}
+        nfib_optimism={latest?.nfib_optimism}
+      />
 
       {/* ── 5. PRIME RATE CALCULATOR ── */}
       {latest?.dprime != null && (

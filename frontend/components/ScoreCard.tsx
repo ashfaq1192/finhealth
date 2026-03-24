@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 export type ScoreState = "current" | "stale" | "unavailable" | "cold-start";
 
 interface ScoreCardProps {
@@ -63,7 +67,90 @@ const ZONE_LABELS = [
   { label: "Optimal", color: "bg-green-400", width: "w-[20%]" },
 ];
 
+// ── Animation session helpers ──────────────────────────────────────────────
+const ANIM_KEY = "fh_score_anim_v1";
+const REPLAY_MS = 30 * 60 * 1000; // 30 minutes
+
+function shouldPlayAnimation(): boolean {
+  try {
+    const raw = sessionStorage.getItem(ANIM_KEY);
+    if (!raw) return true;
+    const { ts } = JSON.parse(raw);
+    return Date.now() - ts > REPLAY_MS;
+  } catch {
+    return true;
+  }
+}
+
+export function markAnimationPlayed(): void {
+  try {
+    sessionStorage.setItem(ANIM_KEY, JSON.stringify({ ts: Date.now() }));
+  } catch {}
+}
+
+// ── Hook: slot-machine count-up ────────────────────────────────────────────
+function useSlotMachineScore(target: number | null) {
+  const [display, setDisplay] = useState<number | null>(null);
+  const [animating, setAnimating] = useState(false);
+  const lastRandom = useRef(0);
+
+  useEffect(() => {
+    if (target === null) return;
+
+    if (!shouldPlayAnimation()) {
+      setDisplay(target);
+      return;
+    }
+
+    setAnimating(true);
+    setDisplay(null); // show placeholder while animating
+
+    const PHASE1_MS = 1200;
+    const TICK_MS = 75;
+    let elapsed = 0;
+
+    const interval = setInterval(() => {
+      elapsed += TICK_MS;
+      const rand = Math.floor(Math.random() * 101);
+      lastRandom.current = rand;
+      setDisplay(rand);
+
+      if (elapsed >= PHASE1_MS) {
+        clearInterval(interval);
+
+        // Phase 2: ease toward real value
+        const phase2Start = performance.now();
+        const PHASE2_MS = 1000;
+        const startVal = lastRandom.current;
+
+        const ease = (now: number) => {
+          const progress = Math.min((now - phase2Start) / PHASE2_MS, 1);
+          const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+          setDisplay(Math.round(startVal + (target - startVal) * eased));
+
+          if (progress < 1) {
+            requestAnimationFrame(ease);
+          } else {
+            setDisplay(target);
+            setAnimating(false);
+            markAnimationPlayed();
+          }
+        };
+
+        requestAnimationFrame(ease);
+      }
+    }, TICK_MS);
+
+    return () => clearInterval(interval);
+  }, [target]);
+
+  return { display, animating };
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 export default function ScoreCard({ score, label, date, reasoning, state }: ScoreCardProps) {
+  const { display: displayScore, animating } = useSlotMachineScore(score);
+
   if (state === "cold-start") {
     return (
       <div className="text-center py-20 bg-slate-50 rounded-2xl border border-slate-200">
@@ -87,7 +174,7 @@ export default function ScoreCard({ score, label, date, reasoning, state }: Scor
   }
 
   const theme = label ? (THEME[label] ?? DEFAULT_THEME) : DEFAULT_THEME;
-  const scorePercent = score ?? 0;
+  const scorePercent = displayScore ?? 0;
 
   return (
     <div className={`rounded-2xl border ${theme.border} ${theme.bg} overflow-hidden`}>
@@ -97,17 +184,32 @@ export default function ScoreCard({ score, label, date, reasoning, state }: Scor
           Business Funding Climate Score
         </p>
 
-        <div className={`text-9xl font-black leading-none ${theme.score}`}>
-          {score}
+        {/* Score number with slot-machine effect */}
+        <div
+          className={`text-9xl font-black leading-none transition-colors duration-300 ${
+            animating ? "text-slate-400 tabular-nums" : theme.score
+          }`}
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {displayScore !== null ? displayScore : (
+            <span className="inline-block w-32 h-24 bg-slate-200 rounded-xl animate-pulse" />
+          )}
         </div>
 
+        {/* Animating hint */}
+        {animating && (
+          <p className="text-[11px] text-slate-400 font-medium tracking-widest uppercase mt-2 animate-pulse">
+            Calculating today&apos;s score…
+          </p>
+        )}
+
         <div className="mt-4 flex items-center justify-center gap-3">
-          {label && (
+          {label && !animating && (
             <span className={`px-4 py-1 rounded-full border text-sm font-bold ${theme.badge}`}>
               {label}
             </span>
           )}
-          {date && (
+          {date && !animating && (
             <span className={`text-sm ${state === "stale" ? "text-amber-600 font-medium" : "text-slate-400"}`}>
               as of {formatDate(date)}
               {state === "stale" && " · refresh pending"}
@@ -125,9 +227,9 @@ export default function ScoreCard({ score, label, date, reasoning, state }: Scor
               <div key={z.label} className={`${z.color} ${z.width}`} />
             ))}
           </div>
-          {/* Marker */}
+          {/* Marker — slides with the animated score */}
           <div
-            className="absolute top-0 w-1 h-3 bg-slate-900 rounded-full -translate-x-1/2"
+            className="absolute top-0 w-1 h-3 bg-slate-900 rounded-full -translate-x-1/2 transition-[left] duration-75"
             style={{ left: `${scorePercent}%` }}
           />
           {/* Zone labels */}
@@ -141,7 +243,7 @@ export default function ScoreCard({ score, label, date, reasoning, state }: Scor
       </div>
 
       {/* Reasoning bullets */}
-      {reasoning.length > 0 && (
+      {reasoning.length > 0 && !animating && (
         <div className="bg-white border-t border-slate-100 px-8 py-6">
           <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-4">
             Key Drivers
@@ -154,6 +256,23 @@ export default function ScoreCard({ score, label, date, reasoning, state }: Scor
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Reasoning placeholder while animating */}
+      {reasoning.length > 0 && animating && (
+        <div className="bg-white border-t border-slate-100 px-8 py-6">
+          <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-4">
+            Key Drivers
+          </p>
+          <div className="space-y-3">
+            {reasoning.map((_, i) => (
+              <div key={i} className="flex gap-3 items-center">
+                <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-200" />
+                <div className="h-3 bg-slate-100 rounded animate-pulse flex-1" style={{ width: `${70 + (i * 13) % 25}%` }} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
