@@ -8,11 +8,26 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Small Business Funding Analysis | US Business Funding Climate Score",
+  title: "Small Business Funding Analysis — Trucking, Retail, SBA Loans & More",
   description:
-    "Expert analysis of US small business funding conditions across trucking, retail, SBA loans, staffing, and macro sectors. Updated daily.",
+    "Daily analysis of US small business funding conditions for trucking companies, retailers, SBA loan applicants, staffing agencies, and the broader macro environment. Understand what today's Federal Reserve data means for your loan application.",
+  keywords: [
+    "small business funding analysis",
+    "SBA loan news today",
+    "trucking company funding",
+    "retail business loans",
+    "staffing agency invoice factoring",
+    "small business credit market",
+  ],
   alternates: {
     canonical: "/blog",
+  },
+  openGraph: {
+    title: "Small Business Funding Analysis — Trucking, Retail, SBA Loans & More",
+    description:
+      "Daily analysis of US small business funding conditions by sector — trucking, retail, SBA loans, staffing, and macro. Powered by Federal Reserve data.",
+    type: "website",
+    url: "https://usfundingclimate.com/blog",
   },
 };
 

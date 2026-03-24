@@ -4,8 +4,36 @@ import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 
 export const metadata: Metadata = {
+  title: "US Business Funding Climate Score — Daily Small Business Lending Index",
+  description:
+    "Free daily score (0–100) measuring how favorable US conditions are for small business loans. Powered by 6 Federal Reserve indicators: prime rate, yield curve, C&I lending standards, jobless claims, NFIB optimism, and new business applications. Updated every morning at 9 AM EST.",
+  keywords: [
+    "small business funding",
+    "business loan conditions today",
+    "SBA loan rates today",
+    "prime rate small business loans",
+    "small business lending index",
+    "is now a good time for a business loan",
+    "US small business credit conditions",
+    "business funding climate score",
+  ],
   alternates: {
     canonical: "/",
+  },
+  openGraph: {
+    title: "US Business Funding Climate Score — Daily Small Business Lending Index",
+    description:
+      "Free daily score (0–100) measuring how favorable US conditions are for small business loans — powered by 6 Federal Reserve indicators. Updated every morning.",
+    type: "website",
+    url: "https://usfundingclimate.com",
+    siteName: "US Business Funding Climate Score",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "US Business Funding Climate Score",
+    description:
+      "Free daily score (0–100) measuring how favorable US conditions are for small business loans — powered by 6 Federal Reserve indicators.",
   },
 };
 import ScoreCard, { ScoreState } from "@/components/ScoreCard";
@@ -152,7 +180,58 @@ export default async function HomePage() {
 
   const state = computeScoreState(latest);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://usfundingclimate.com/#website",
+        "url": "https://usfundingclimate.com",
+        "name": "US Business Funding Climate Score",
+        "description": "Daily composite score measuring how favorable US conditions are for small business loans, powered by Federal Reserve economic data.",
+        "inLanguage": "en-US",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://usfundingclimate.com/blog?category={search_term_string}",
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://usfundingclimate.com/#organization",
+        "name": "US Business Funding Climate Score",
+        "url": "https://usfundingclimate.com",
+        "sameAs": [],
+        "founder": {
+          "@type": "Person",
+          "name": "M. Ashfaq",
+          "jobTitle": "M.Phil Economics",
+        },
+      },
+      {
+        "@type": "DataFeed",
+        "@id": "https://usfundingclimate.com/#datafeed",
+        "name": "US Business Funding Climate Score — Daily Index",
+        "description": "Daily composite score (0–100) for US small business funding conditions, computed from 6 Federal Reserve FRED series.",
+        "url": "https://usfundingclimate.com",
+        "provider": {
+          "@id": "https://usfundingclimate.com/#organization",
+        },
+        "encodingFormat": "text/html",
+        "inLanguage": "en-US",
+      },
+    ],
+  };
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
     <div className="max-w-5xl mx-auto px-4 py-8">
 
       {/* ── 1. HERO ROW: Score + Indicators ── */}
@@ -271,5 +350,6 @@ export default async function HomePage() {
       )}
 
     </div>
+    </>
   );
 }

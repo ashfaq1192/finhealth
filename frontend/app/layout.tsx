@@ -7,11 +7,28 @@ import Script from "next/script";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://usfundingclimate.com"),
-  title: "US Business Funding Climate Score",
+  title: {
+    default: "US Business Funding Climate Score",
+    template: "%s | US Business Funding Climate Score",
+  },
   description:
-    "Daily AI-generated indicator of US small business funding conditions, powered by FRED economic data.",
-  alternates: {
-    canonical: "/",
+    "Free daily score (0–100) measuring US small business funding conditions, powered by 6 Federal Reserve indicators. Updated every morning.",
+  openGraph: {
+    type: "website",
+    siteName: "US Business Funding Climate Score",
+    locale: "en_US",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "US Business Funding Climate Score — Daily Small Business Lending Index",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/opengraph-image"],
   },
   other: {
     "google-adsense-account": "ca-pub-9488224992325074",
