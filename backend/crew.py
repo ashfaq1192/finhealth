@@ -296,15 +296,18 @@ def run() -> int:
 
             now_iso = datetime.now(timezone.utc).isoformat()
             raw_slug = post_data.get("slug", "")
-            # Sanitize AI-generated slug: lowercase, hyphens only, no dates, max 80 chars
+            # Sanitize AI-generated slug: lowercase, hyphens only, max 60 chars base
             sanitized_slug = re.sub(r"[^a-z0-9-]", "", raw_slug.lower().replace(" ", "-"))
-            sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:80]
+            sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:60]
             if not sanitized_slug:
                 title = post_data.get("title", "")
                 sanitized_slug = re.sub(r"[^a-z0-9-]", "", title.lower().replace(" ", "-"))
-                sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:80]
+                sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:60]
             if not sanitized_slug:
                 sanitized_slug = f"{get_todays_category().lower().replace(' ', '-')}-funding-conditions"
+            # Append date to guarantee uniqueness across repeated category cycles
+            today_compact = today.replace("-", "")
+            sanitized_slug = f"{sanitized_slug}-{today_compact}"
             post_row = {
                 "date": today,
                 "title": post_data.get("title", f"Business Funding Climate: {today}"),
