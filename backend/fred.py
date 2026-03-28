@@ -75,23 +75,11 @@ def _compute_cpi_yoy(api_key: str) -> "float | None":
         return None
 
 
-def _fetch_nfib(api_key: str) -> "float | None":
-    """
-    Return latest NFIB Small Business Optimism Index (NFIBSCIB, monthly, SA).
-    Non-fatal — returns None on any failure.
-    """
-    try:
-        obs = _fetch_series("NFIBSCIB", api_key, limit=2)
-        return _latest_value(obs)
-    except Exception as exc:
-        print(f"[fred] NFIB fetch failed (non-fatal): {exc}")
-        return None
-
 
 def fetch_all_indicators() -> dict[str, Any]:
     """
     Fetch all 6 core FRED indicators and return a dict with their latest values.
-    Also attempts 2 optional context indicators: CPI YoY (CPIAUCSL) and NFIB (NFIBSCIB).
+    Also attempts 1 optional context indicator: CPI YoY (CPIAUCSL).
     Raises RuntimeError only if a core indicator cannot be fetched.
     """
     api_key = os.environ["FRED_API_KEY"]
@@ -142,16 +130,11 @@ def fetch_all_indicators() -> dict[str, Any]:
     if missing:
         raise RuntimeError(f"Could not fetch indicators: {missing}")
 
-    # Optional context indicators — logged but never fatal
+    # Optional context indicator — logged but never fatal
     cpi = _compute_cpi_yoy(api_key)
     if cpi is not None:
         result["cpi_yoy"] = cpi
         print(f"[fred] CPI YoY: {cpi}%")
-
-    nfib = _fetch_nfib(api_key)
-    if nfib is not None:
-        result["nfib_optimism"] = nfib
-        print(f"[fred] NFIB Optimism: {nfib}")
 
     result["fetch_date"] = datetime.utcnow().date().isoformat()
     return result
