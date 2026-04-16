@@ -252,7 +252,10 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
     else:
         planned = _plan_calendar(dates_to_process)
 
-    print(f"[calendar] Groq returned {len(planned)} entries")
+    if dry_run:
+        print(f"[calendar] Planned {len(planned)} entries (dry run — Groq not called)")
+    else:
+        print(f"[calendar] Groq returned {len(planned)} entries")
 
     # ── Step 2 + 3: Generate images + upload ──────────────────────────────────
     results = []
