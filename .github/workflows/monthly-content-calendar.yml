@@ -1,0 +1,71 @@
+name: Monthly Content Calendar + Image Generation
+
+on:
+  schedule:
+    # Run on the 28th of every month at 10:00 UTC
+    # This generates images for the NEXT month while current month still has 2-3 days of buffer
+    - cron: "0 10 28 * *"
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Target month (YYYY-MM). Leave blank to generate next calendar month."
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run — plan topics only, no Modal calls, no DB writes"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  generate-content-calendar:
+    name: Plan Topics + Generate Blog Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run content calendar generator
+        env:
+          GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MODAL_FLUX_URL:       ${{ secrets.MODAL_FLUX_URL }}
+          MODAL_TOKEN_ID:       ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET:   ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          MONTH_ARG=""
+          DRY_RUN_ARG=""
+          if [ -n "${{ github.event.inputs.month }}" ]; then
+            MONTH_ARG="--month ${{ github.event.inputs.month }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_ARG="--dry-run"
+          fi
+          python backend/generate_monthly_images.py $MONTH_ARG $DRY_RUN_ARG
+
+      - name: Write job summary on success
+        if: success()
+        run: |
+          echo "## Content Calendar — SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "Images generated and uploaded at $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "Next step: daily pipeline will pick images automatically from \`content_calendar\`." >> $GITHUB_STEP_SUMMARY
+
+      - name: Write job summary on failure
+        if: failure()
+        run: |
+          echo "## Content Calendar — FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "Failed at $(date -u '+%Y-%m-%d %H:%M UTC'). Check logs above." >> $GITHUB_STEP_SUMMARY
+          echo "Daily pipeline will still run — it falls back to no hero image if calendar row is missing." >> $GITHUB_STEP_SUMMARY

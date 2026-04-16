@@ -227,6 +227,19 @@ export default async function BlogPostPage({ params }: Props) {
               </div>
               <h1 className="text-2xl font-bold text-slate-900 leading-tight">{post.title}</h1>
               <p className="text-slate-500 mt-2 text-sm leading-relaxed">{post.meta_description}</p>
+              {/* Author byline — E-E-A-T signal for Google */}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-bold">A</span>
+                </div>
+                <div className="text-xs text-slate-500 leading-tight">
+                  By{" "}
+                  <Link href="/about" className="font-semibold text-slate-700 hover:text-blue-600 transition-colors">
+                    M. Ashfaq
+                  </Link>
+                  <span className="text-slate-400"> · M.Phil Economics · Economist &amp; Financial Data Analyst</span>
+                </div>
+              </div>
             </div>
 
             {/* Hero image — after title so H1 keyword is indexed first */}

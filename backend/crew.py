@@ -118,10 +118,41 @@ def _parse_json_output(raw: str) -> dict | list:
     return json.loads(repair_json(candidate))
 
 
+def _fetch_calendar_entry(supabase_client, today: str) -> dict | None:
+    """
+    Check content_calendar for a pre-planned entry for today.
+    Returns the row dict or None if no entry exists / table doesn't exist yet.
+    """
+    try:
+        resp = (
+            supabase_client.table("content_calendar")
+            .select("topic, category, seo_keyword, image_url, image_status, id")
+            .eq("scheduled_date", today)
+            .single()
+            .execute()
+        )
+        return resp.data
+    except Exception:
+        return None
+
+
 def run() -> int:
     """Execute the full pipeline. Returns 0 on success, 1 on failure."""
     today = datetime.now(timezone.utc).date().isoformat()
     print(f"[crew] Starting pipeline for {today}")
+
+    # Step 0: Check content_calendar for a pre-planned topic + pre-generated hero image
+    # This runs early so the topic can influence the CrewAI writing task below.
+    # Falls back gracefully to the existing behaviour if no entry is found.
+    supabase = create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SERVICE_KEY"],
+    )
+    calendar_entry = _fetch_calendar_entry(supabase, today)
+    if calendar_entry:
+        print(f"[crew] Content calendar entry found: {calendar_entry.get('topic', '')[:80]}")
+    else:
+        print("[crew] No content calendar entry for today — using default category rotation")
 
     # Step 1: Fetch FRED indicators — 3 attempts, 10s / 30s gaps
     # FRED is a public government API; occasional 503s or slow responses are the typical failure.
@@ -157,7 +188,8 @@ def run() -> int:
         _crew_result: dict[str, Any] = {}
 
         def _kickoff_crew() -> None:
-            ft, et, wt, edt = build_tasks(indicators_json, score_json)
+            topic_override = calendar_entry.get("topic") if calendar_entry else None
+            ft, et, wt, edt = build_tasks(indicators_json, score_json, topic_override=topic_override)
             c = Crew(
                 agents=[data_fetcher_agent, economist_agent, writer_agent, editor_agent],
                 tasks=[ft, et, wt, edt],
@@ -245,12 +277,7 @@ def run() -> int:
             raw_content,
         ).rstrip()
 
-    # Step 4: Upsert to Supabase
-    supabase = create_client(
-        os.environ["SUPABASE_URL"],
-        os.environ["SUPABASE_SERVICE_KEY"],
-    )
-
+    # Step 4: Upsert to Supabase (client already created in Step 0)
     score_saved = False
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -308,16 +335,31 @@ def run() -> int:
             # Append date to guarantee uniqueness across repeated category cycles
             today_compact = today.replace("-", "")
             sanitized_slug = f"{sanitized_slug}-{today_compact}"
+            # Use category from calendar if available, else derive from rotation
+            category = (
+                calendar_entry.get("category") if calendar_entry
+                else get_todays_category()
+            )
+            # Use pre-generated hero image from calendar if available
+            hero_image_url = (
+                calendar_entry.get("image_url")
+                if calendar_entry and calendar_entry.get("image_status") == "generated"
+                else None
+            )
             post_row = {
                 "date": today,
                 "title": post_data.get("title", f"Business Funding Climate: {today}"),
                 "slug": sanitized_slug,
                 "content": post_data.get("content", ""),
                 "meta_description": _truncate_meta(post_data.get("meta_description", "")),
-                "category": get_todays_category(),
+                "category": category,
                 "score_id": score_id,
                 "updated_at": now_iso,
             }
+            if hero_image_url:
+                post_row["hero_image_url"] = hero_image_url
+                print(f"[crew] Using pre-generated hero image from content_calendar")
+
             _retry(
                 lambda: supabase.table("blog_posts").upsert(post_row, on_conflict="date").execute(),
                 attempts=3,
@@ -325,6 +367,16 @@ def run() -> int:
                 label="Supabase blog post upsert",
             )
             print(f"[crew] Blog post upserted to blog_posts for {today}")
+
+            # Mark calendar entry as used
+            if calendar_entry and calendar_entry.get("id"):
+                try:
+                    supabase.table("content_calendar").update({"used": True}).eq(
+                        "id", calendar_entry["id"]
+                    ).execute()
+                except Exception:
+                    pass  # Non-fatal — audit only
+
             post_saved = True
         except Exception as exc:
             print(f"[crew] ERROR: Failed to save blog post after 3 attempts: {exc}", file=sys.stderr)

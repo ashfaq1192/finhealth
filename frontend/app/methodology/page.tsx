@@ -96,11 +96,19 @@ export default function MethodologyPage() {
           Transparency
         </p>
         <h1 className="text-3xl font-bold text-slate-900 mb-3">Our Methodology</h1>
-        <p className="text-slate-600 leading-relaxed text-sm">
+        <p className="text-slate-600 leading-relaxed text-sm mb-3">
           The US Business Funding Climate Score is built on public data from the Federal Reserve
           and the US Department of Labor. This page explains every data source, every FRED series
           ID, and the exact formula used to calculate the 0–100 score. No black boxes.
         </p>
+        <div className="flex items-center gap-2 text-xs text-slate-400 border-t border-slate-100 pt-3">
+          <span>Reviewed and maintained by</span>
+          <Link href="/about" className="font-semibold text-slate-600 hover:text-blue-600 transition-colors">
+            M. Ashfaq, M.Phil Economics
+          </Link>
+          <span>·</span>
+          <span>Last updated April 2026</span>
+        </div>
       </div>
 
       {/* Scoring formula */}

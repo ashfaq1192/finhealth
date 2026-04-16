@@ -252,7 +252,7 @@ export default async function HomePage() {
               What Is This?
             </p>
             <p className="text-sm text-slate-600 leading-relaxed mb-4">
-              A daily composite score (0–100) measuring how favourable US economic
+              A daily composite score (0–100) measuring how favorable US economic
               conditions are for small business funding — powered by 6 Federal Reserve
               indicators, updated every morning.
             </p>

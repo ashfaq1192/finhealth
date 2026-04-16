@@ -12,10 +12,15 @@ export default function Disclaimer() {
             Not financial advice.
           </Link>
         </p>
-        <nav className="flex items-center gap-4 flex-shrink-0">
+        <nav className="flex flex-wrap items-center gap-4 flex-shrink-0">
           <Link href="/about" className="hover:text-slate-200 transition-colors">About</Link>
           <Link href="/methodology" className="hover:text-slate-200 transition-colors">Methodology</Link>
+          <Link href="/disclaimer" className="hover:text-slate-200 transition-colors">Disclaimer</Link>
           <Link href="/legal" className="hover:text-slate-200 transition-colors">Legal</Link>
+          <Link href="/terms" className="hover:text-slate-200 transition-colors">Terms</Link>
+          <Link href="/privacy-policy" className="hover:text-slate-200 transition-colors">Privacy Policy</Link>
+          <Link href="/contact" className="hover:text-slate-200 transition-colors">Contact</Link>
+          <Link href="/advertise" className="hover:text-slate-200 transition-colors">Advertise</Link>
         </nav>
       </div>
     </footer>

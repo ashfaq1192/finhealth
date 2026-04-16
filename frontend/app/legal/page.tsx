@@ -16,8 +16,8 @@ export const metadata: Metadata = {
 // UPDATE THESE before going live
 // ─────────────────────────────────────────────────────────────────────────────
 const SITE_NAME = "US Business Funding Climate Score";
-const CONTACT_EMAIL = "ashfaqahmed1192@gmail.com";
-const LAST_UPDATED = "March 2026";
+const CONTACT_EMAIL = "info@usfundingclimate.com";
+const LAST_UPDATED = "April 2026";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LegalPage() {
@@ -126,73 +126,21 @@ export default function LegalPage() {
           </p>
         </div>
 
-        {/* Privacy Policy */}
+        {/* Privacy Policy — pointer to dedicated page */}
         <div className="bg-white rounded-2xl border border-slate-200 p-8">
           <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-4">
             Privacy Policy
           </p>
-          <div className="space-y-4 text-sm text-slate-700 leading-relaxed">
-            <div>
-              <p className="font-semibold text-slate-800 mb-1">Information We Collect</p>
-              <p>
-                This site does not require account registration. If you subscribe to our daily
-                email digest, we collect your email address solely for that purpose. You may
-                unsubscribe at any time via the link in any email. We also use Google Analytics
-                and Google AdSense, which may collect anonymized usage data including IP
-                addresses, browser type, pages visited, and referring URLs for analytics and
-                advertising purposes.
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800 mb-1">Cookies</p>
-              <p>
-                This site uses cookies placed by Google AdSense and Google Analytics for
-                advertising measurement and site analytics. You can opt out of personalized
-                advertising at{" "}
-                <a
-                  href="https://adssettings.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  Google&apos;s Ad Settings
-                </a>
-                .
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800 mb-1">Third-Party Services</p>
-              <p>
-                We use Supabase (database hosting), Cloudflare (CDN and hosting), Google AdSense
-                (advertising), and Groq (AI inference). Each service has its own privacy policy
-                governing data they independently process.
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800 mb-1">Data Retention</p>
-              <p>
-                We do not store visitor data beyond what is retained by the third-party analytics
-                and advertising services described above. We do not sell personal data to any
-                third party.
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800 mb-1">CCPA / GDPR Rights</p>
-              <p>
-                If you are a California resident or EU/EEA citizen and wish to exercise your data
-                rights (access, deletion, correction, or opt-out of sale), please contact us via
-                the email address below. We will respond within 30 days.
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800 mb-1">Children&apos;s Privacy</p>
-              <p>
-                This site is not directed at children under the age of 13 and does not knowingly
-                collect personal data from children. If you believe a child has submitted personal
-                information to us, please contact us immediately.
-              </p>
-            </div>
-          </div>
+          <p className="text-sm text-slate-700 leading-relaxed mb-4">
+            Our full Privacy Policy — including details on cookies, Google AdSense, data
+            retention, and your CCPA/GDPR rights — is available at a dedicated page:
+          </p>
+          <Link
+            href="/privacy-policy"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors"
+          >
+            Read our Privacy Policy →
+          </Link>
         </div>
 
         {/* Contact */}
@@ -206,12 +154,15 @@ export default function LegalPage() {
           >
             {CONTACT_EMAIL}
           </a>
-          <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-center gap-6">
+          <div className="mt-4 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-center gap-6">
             <Link href="/about" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
               About →
             </Link>
             <Link href="/methodology" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
               Methodology →
+            </Link>
+            <Link href="/privacy-policy" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
+              Privacy Policy →
             </Link>
           </div>
         </div>
