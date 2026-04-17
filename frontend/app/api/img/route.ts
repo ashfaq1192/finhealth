@@ -18,8 +18,16 @@ export async function GET(request: Request) {
     return new Response("Missing url parameter", { status: 400 });
   }
 
-  // Security: only proxy Pollinations images — not an open proxy
-  if (!url.startsWith("https://image.pollinations.ai/")) {
+  // Security: only proxy Pollinations images — not an open proxy.
+  // Must parse the URL and check hostname exactly; startsWith() can be
+  // bypassed with https://image.pollinations.ai.attacker.com/...
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return new Response("Invalid URL", { status: 400 });
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "image.pollinations.ai") {
     return new Response("Forbidden", { status: 403 });
   }
 

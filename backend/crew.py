@@ -292,7 +292,7 @@ def run() -> int:
             reasoning = [
                 f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",
                 f"Treasury yield spread at {indicators['t10y2y']}% signals credit market conditions.",
-                f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labour market health.",
+                f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labor market health.",
                 f"C&I tightening for large firms at {indicators['drtscilm']}% tightens overall credit supply.",
                 f"C&I tightening for small firms at {indicators['drtscis']}% directly constrains small business lending.",
                 f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",
@@ -305,13 +305,21 @@ def run() -> int:
                 post_data = _parse_json_output(editor_output)
                 print("[crew] Using editor-polished blog post.")
             except Exception as exc:
-                print(f"[crew] WARNING: Could not parse editor output: {exc}", file=sys.stderr)
+                print(
+                    f"[crew] WARNING: Could not parse editor output: {exc}. "
+                    f"Raw preview: {editor_output[:300]!r}",
+                    file=sys.stderr,
+                )
         if post_data is None and writer_output:
             try:
                 post_data = _parse_json_output(writer_output)
                 print("[crew] Fallback: using raw writer output (editor parse failed).")
             except Exception as exc:
-                print(f"[crew] WARNING: Could not parse writer output either: {exc}", file=sys.stderr)
+                print(
+                    f"[crew] WARNING: Could not parse writer output either: {exc}. "
+                    f"Raw preview: {writer_output[:300]!r}",
+                    file=sys.stderr,
+                )
 
     except Exception as exc:
         print(f"[crew] CrewAI pipeline error: {exc}", file=sys.stderr)
@@ -319,7 +327,7 @@ def run() -> int:
         reasoning = [
             f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",
             f"Treasury yield spread at {indicators['t10y2y']}% signals credit market conditions.",
-            f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labour market health.",
+            f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labor market health.",
             f"C&I tightening for large firms at {indicators['drtscilm']}% tightens overall credit supply.",
             f"C&I tightening for small firms at {indicators['drtscis']}% directly constrains small business lending.",
             f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",

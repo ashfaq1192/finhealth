@@ -11,8 +11,9 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  // Basic validation — edge runtime has no regex engine limits
-  if (!email || !email.includes("@") || !email.includes(".")) {
+  // RFC 5322 simplified: local@domain.tld — catches "test@.com", "test@com", "@foo.com"
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!email || !emailRe.test(email)) {
     return Response.json({ error: "A valid email address is required." }, { status: 400 });
   }
 

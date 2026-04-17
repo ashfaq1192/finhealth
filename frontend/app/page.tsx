@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 export const metadata: Metadata = {
   title: "US Business Funding Climate Score — Daily Small Business Lending Index",
   description:
-    "Free daily score (0–100) measuring how favorable US conditions are for small business loans. Powered by 6 Federal Reserve indicators: prime rate, yield curve, C&I lending standards, jobless claims, NFIB optimism, and new business applications. Updated every morning at 9 AM EST.",
+    "Free daily score (0–100) measuring how favorable US conditions are for small business loans. Powered by 6 Federal Reserve indicators: prime rate, yield curve, C&I lending standards, jobless claims, NFIB optimism, and new business applications. Updated every morning at 9 AM ET.",
   keywords: [
     "small business funding",
     "business loan conditions today",
@@ -270,7 +270,7 @@ export default async function HomePage() {
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 mt-3 text-center">Updated daily · 9 AM EST</p>
+            <p className="text-[11px] text-slate-400 mt-3 text-center">Updated daily · 9 AM ET</p>
           </div>
         </div>
       </div>

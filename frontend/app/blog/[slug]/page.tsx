@@ -156,7 +156,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   // Prefer uploaded hero image; fall back to first markdown image (proxied to avoid CORS/hotlink issues)
   const heroSrc = post.hero_image_url || proxyImage(extractFirstImage(post.content));
-  const canonicalUrl = `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com").trim()}/blog/${post.slug}`;
+  const canonicalUrl = `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim()}/blog/${post.slug}`;
 
   // Strip the first markdown image from content only when a hero is being shown
   const safeHtml = sanitizeHtml(post.content, !!heroSrc);
@@ -175,13 +175,13 @@ export default async function BlogPostPage({ params }: Props) {
     author: {
       "@type": "Person",
       name: "Ashfaq Ahmad",
-      url: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com").trim()}/about`,
+      url: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim()}/about`,
       jobTitle: "M.Phil Economics",
     },
     publisher: {
       "@type": "Organization",
       name: "US Business Funding Climate Score",
-      url: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com").trim(),
+      url: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim(),
     },
     articleSection: post.category,
     keywords: `small business funding, ${post.category.toLowerCase()}, business loans, SBA loans, prime rate`,

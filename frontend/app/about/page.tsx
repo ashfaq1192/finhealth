@@ -60,7 +60,7 @@ export default function AboutPage() {
             and charge accordingly. Small businesses have had no equivalent resource — until now.
           </p>
           <p>
-            The US Business Funding Climate Score runs every morning at 9 AM EST, pulling the
+            The US Business Funding Climate Score runs every morning at 9 AM ET, pulling the
             six FRED indicators most directly tied to small business credit access, computing a
             deterministic 0&ndash;100 score using a formula designed by a trained economist, and
             publishing both the score and a plain-English explanation of the mechanisms driving it.

@@ -6,7 +6,7 @@ Each post targets a high-CPC search term and uses today's score as supporting
 data — not the headline topic. This makes posts rank for months, not one day.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from crewai import Task
 
@@ -92,7 +92,7 @@ CATEGORY_SEO = {
 
 def get_todays_category() -> str:
     """Derive today's blog category from day-of-year — deterministic, no DB state."""
-    day_of_year = datetime.utcnow().timetuple().tm_yday
+    day_of_year = datetime.now(timezone.utc).timetuple().tm_yday
     return CATEGORIES[day_of_year % len(CATEGORIES)]
 
 
@@ -108,7 +108,7 @@ def build_tasks(
     topic_override: when set (from content_calendar), the writer is directed to
                     write about this specific pre-planned topic instead of a generic category post.
     """
-    today = datetime.utcnow().date().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
     category = get_todays_category()
     seo = CATEGORY_SEO[category]
 

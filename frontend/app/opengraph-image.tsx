@@ -63,7 +63,7 @@ export default function OgImage() {
               textTransform: "uppercase",
             }}
           >
-            Updated Daily · 9 AM EST
+            Updated Daily · 9 AM ET
           </span>
         </div>
 

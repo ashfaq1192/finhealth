@@ -4,7 +4,7 @@ Fetches the 6 canonical economic indicators using verified series IDs.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
@@ -136,5 +136,5 @@ def fetch_all_indicators() -> dict[str, Any]:
         result["cpi_yoy"] = cpi
         print(f"[fred] CPI YoY: {cpi}%")
 
-    result["fetch_date"] = datetime.utcnow().date().isoformat()
+    result["fetch_date"] = datetime.now(timezone.utc).date().isoformat()
     return result

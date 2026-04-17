@@ -55,7 +55,7 @@ export default function EmailCapture() {
           </p>
           <p className="text-sm text-blue-200 leading-relaxed">
             Prime rate changes, credit tightening signals, and today&apos;s funding
-            climate — in your inbox every morning at 9 AM EST. No spam, ever.
+            climate — in your inbox every morning at 9 AM ET. No spam, ever.
           </p>
         </div>
 
