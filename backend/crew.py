@@ -118,6 +118,37 @@ def _parse_json_output(raw: str) -> dict | list:
     return json.loads(repair_json(candidate))
 
 
+def _qa_post_content(post_data: dict) -> tuple[bool, str]:
+    """
+    Validate article quality before DB upsert.
+    Returns (passed, reason). Reason is empty string on pass.
+    """
+    required_keys = ("title", "slug", "content", "meta_description")
+    for key in required_keys:
+        if not post_data.get(key, "").strip():
+            return False, f"Missing or empty field: {key}"
+
+    content = post_data["content"]
+    word_count = len(content.split())
+    if word_count < 900:
+        return False, f"Word count too low: {word_count} words (minimum 900)"
+
+    h2_count = content.count("\n## ")
+    # Also catch H2 at start of content (no leading newline)
+    if content.startswith("## "):
+        h2_count += 1
+    if h2_count < 2:
+        return False, f"Too few H2 sections: {h2_count} (minimum 2)"
+
+    h3_count = content.count("\n### ")
+    if content.startswith("### "):
+        h3_count += 1
+    if h3_count < 1:
+        return False, "No FAQ H3 questions found (minimum 1)"
+
+    return True, ""
+
+
 def _fetch_calendar_entry(supabase_client, today: str) -> dict | None:
     """
     Check content_calendar for a pre-planned entry for today.
@@ -277,6 +308,19 @@ def run() -> int:
             raw_content,
         ).rstrip()
 
+    # Step 3b: QA gate — reject posts that fail structural requirements
+    if post_data:
+        qa_passed, qa_reason = _qa_post_content(post_data)
+        if not qa_passed:
+            print(
+                f"[crew] QA GATE FAILED: {qa_reason}. Blog post discarded.",
+                file=sys.stderr,
+            )
+            post_data = None
+        else:
+            wc = len(post_data["content"].split())
+            print(f"[crew] QA gate passed: {wc} words, structure OK.")
+
     # Step 4: Upsert to Supabase (client already created in Step 0)
     score_saved = False
     try:
@@ -387,10 +431,17 @@ def run() -> int:
         return 1
 
     if not post_saved:
-        print("[crew] PARTIAL SUCCESS: Score saved, blog post failed. Logged above.")
+        print(
+            "[crew] PARTIAL FAILURE: Score saved, blog post failed. "
+            "Exiting with code 1 to trigger GitHub Actions alert.",
+            file=sys.stderr,
+        )
+        print(f"[crew] Pipeline complete. Score={score_result['health_score']} "
+              f"({score_result['status_label']}), BlogPost=failed")
+        return 1
 
     print(f"[crew] Pipeline complete. Score={score_result['health_score']} "
-          f"({score_result['status_label']}), BlogPost={'saved' if post_saved else 'failed'}")
+          f"({score_result['status_label']}), BlogPost=saved")
 
     # Step 5: Send daily email digest to subscribers (non-fatal)
     if score_saved:

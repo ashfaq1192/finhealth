@@ -14,7 +14,7 @@ def _llm() -> LLM:
         model="groq/llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
         temperature=0.3,
-        max_tokens=3500,
+        max_tokens=8000,
     )
 
 
@@ -24,7 +24,7 @@ def _editor_llm() -> LLM:
         model="groq/llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
         temperature=0.2,
-        max_tokens=4500,
+        max_tokens=8000,
     )
 
 
@@ -77,11 +77,14 @@ writer_agent = Agent(
         "searching for answers about business funding. Target high-CPC finance keywords. "
         "Use short, punchy sentences. Bold key economic terms. Structure content with "
         "frequent headings and bullet points. "
-        "Write exclusively in American English — spelling, idioms, and financial jargon "
+        "Write exclusively in American English: spelling, idioms, and financial jargon "
         "must all be US-standard. "
         "IMPORTANT: Describe economic conditions and their implications only. "
         "Do NOT recommend specific financial products, advise the reader to borrow, "
-        "or make any direct investment or lending recommendation."
+        "or make any direct investment or lending recommendation. "
+        "Write to get cited by AI search engines (Google AI Overviews, ChatGPT, Perplexity): "
+        "use self-contained answer blocks, cite Federal Reserve data by name, and structure "
+        "claims with specific evidence."
     ),
     backstory=(
         "You are a finance journalist with 15 years covering US small business lending, "
@@ -117,9 +120,14 @@ editor_agent = Agent(
         "You are the Editorial Director of a major US financial media brand. Over 20 years "
         "you have edited 3,000+ articles on SBA loans, invoice factoring, merchant cash "
         "advances, and small business credit for Bloomberg Markets, Forbes Small Business, "
-        "and Entrepreneur Magazine. You think in Google E-E-A-T signals — Experience, "
-        "Expertise, Authoritativeness, Trustworthiness — because you know these directly "
+        "and Entrepreneur Magazine. You think in Google E-E-A-T signals: Experience, "
+        "Expertise, Authoritativeness, Trustworthiness, because you know these directly "
         "determine search ranking for YMYL (Your Money, Your Life) content. "
+        "You are an expert at detecting and eliminating AI-generated writing patterns: "
+        "em dashes, words like 'leverage', 'delve', 'facilitate', 'robust', 'seamless', "
+        "'furthermore', filler intensifiers like 'very', 'incredibly', 'essentially', "
+        "and formulaic openings like 'In today's...'. You replace all of these with "
+        "plain, natural American English that sounds like a human wrote it."
         "You know that 55% of readers abandon an article within 15 seconds if the opening "
         "does not hook them immediately. Your editorial instinct is trained to spot the "
         "four killers of finance content: (1) cliché openings like 'In today's economic "
