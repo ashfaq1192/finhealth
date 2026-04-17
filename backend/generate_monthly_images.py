@@ -43,6 +43,39 @@ sys.path.insert(0, os.path.dirname(__file__))
 from tasks import CATEGORIES, CATEGORY_SEO
 
 
+# ─── Category-specific FLUX composition guides ────────────────────────────────
+# These fix the "headless person" FLUX artifact by specifying exact framing.
+# Rules: full faces always visible, people shown from at least waist up, no edge crops.
+
+CATEGORY_COMPOSITION = {
+    "Trucking": (
+        "a truck driver in a high-visibility jacket standing confidently in front of their "
+        "semi-truck at a freight depot, full figure visible from head to toe, wide shot, "
+        "face clearly visible, industrial background"
+    ),
+    "Retail": (
+        "a small retail store owner smiling behind a shop counter, full face and upper body "
+        "clearly visible, shelves of merchandise visible in background, warm interior lighting, "
+        "medium shot framed from chest up"
+    ),
+    "SBA Loans": (
+        "a small business owner and a bank loan officer seated across a desk reviewing "
+        "documents, both people shown from the waist up with faces clearly visible, "
+        "professional office setting, natural window lighting"
+    ),
+    "Macro": (
+        "wide establishing shot of a busy American main street with small business storefronts "
+        "and signage, golden hour lighting, sharp focus on building facades, "
+        "no close-up people required, slight depth of field"
+    ),
+    "Staffing": (
+        "an HR manager in business attire sitting across from a job candidate at an office "
+        "desk, both people shown from the waist up with faces clearly visible, "
+        "professional office with natural light, medium wide shot"
+    ),
+}
+
+
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 MODAL_FLUX_URL = os.getenv(
@@ -128,6 +161,69 @@ def _upload_to_supabase(supabase, image_bytes: bytes, filename: str) -> str:
     return supabase.storage.from_(SUPABASE_BUCKET).get_public_url(filename)
 
 
+def _qa_image_gemini(
+    image_bytes: bytes,
+    category: str,
+    topic: str,
+) -> tuple[bool, str]:
+    """
+    Use Gemini Flash vision to evaluate a generated image before saving to Supabase.
+    Passes image bytes directly as base64 — no re-fetch needed.
+    Returns (passed, reason).
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        print("[qa] GEMINI_API_KEY not set — skipping visual QA", file=sys.stderr)
+        return True, "skipped (no API key)"
+
+    rubric = (
+        "You are a photo editor for a professional US business finance website. "
+        "Evaluate this blog hero image for publication quality.\n\n"
+        f"Category: {category} | Topic: {topic}\n\n"
+        "REJECT (pass: false) if ANY of these are true:\n"
+        "1. Any person's head, face, or major body part is cut off at the frame edge\n"
+        "2. AI artifacts: extra or fused fingers, melted skin, distorted faces, double limbs\n"
+        "3. Text, logos, watermarks, or UI elements are visible\n"
+        "4. The scene has zero relevance to business, commerce, or workplace\n"
+        "5. Image is blurry, heavily noisy, or visually broken\n"
+        "6. Style is cartoon, illustration, fantasy, or surreal (must be photorealistic)\n\n"
+        "APPROVE (pass: true) if: realistic professional photo, all subjects fully visible "
+        "within the frame, clean composition, relevant to the category.\n\n"
+        'Respond ONLY with valid JSON on a single line: '
+        '{"pass": true, "reason": "brief reason"} or {"pass": false, "reason": "brief reason"}'
+    )
+
+    img_b64 = base64.b64encode(image_bytes).decode()
+    payload = {
+        "contents": [{"parts": [
+            {"text": rubric},
+            {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
+        ]}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 80},
+    }
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.0-flash:generateContent?key={api_key}"
+    )
+    try:
+        resp = requests.post(url, json=payload, timeout=30)
+        resp.raise_for_status()
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        # Strip markdown fences if model wraps response
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        result = json.loads(repair_json(text))
+        passed = bool(result.get("pass", True))
+        reason = result.get("reason", "")
+        return passed, reason
+    except Exception as exc:
+        print(f"[qa] Gemini QA error: {exc} — approving by default", file=sys.stderr)
+        return True, f"qa-error: {exc}"
+
+
 def _plan_calendar(dates: list[date]) -> list[dict]:
     """
     Ask Groq to generate one topic + image_prompt per date.
@@ -145,6 +241,11 @@ def _plan_calendar(dates: list[date]) -> list[dict]:
             "primary_keyword": seo.get("primary", cat),
         })
 
+    # Build the composition reference table so Groq knows exact framing per category
+    composition_table = "\n".join(
+        f"  {cat}: {desc}" for cat, desc in CATEGORY_COMPOSITION.items()
+    )
+
     system = (
         "You are an SEO content strategist for a US small business finance website. "
         "Return ONLY a valid JSON array. No markdown fences. No explanation."
@@ -154,13 +255,20 @@ def _plan_calendar(dates: list[date]) -> list[dict]:
 For each entry output a JSON object with these exact keys:
 - date          (copy from input, YYYY-MM-DD)
 - category      (copy from input)
-- topic         (specific, high-CPC SEO topic — 6-12 words. Must naturally include the primary_keyword.)
+- topic         (specific, high-CPC SEO topic — 6-12 words, must include the primary_keyword)
 - seo_keyword   (the primary_keyword from input, or a closely related long-tail variant)
-- image_prompt  (a concise Flux image generation prompt, 15-30 words.
-                 Style: professional editorial business photography.
-                 Subject: directly relevant to the topic.
-                 Include: "natural lighting, sharp focus, clean background, 8k resolution"
-                 Do NOT mention text, logos, or UI elements.)
+- image_prompt  (FLUX image generation prompt — follow the rules below exactly)
+
+IMAGE PROMPT RULES (critical — violations cause published images with cropped heads):
+1. Start from the COMPOSITION GUIDE for the entry's category (listed below).
+2. All human subjects MUST be fully visible — no head, face, or limb cut off at the frame edge.
+3. Framing: for people, use medium or wide shot (chest-up minimum). Never extreme close-up.
+4. End every prompt with: "photorealistic, professional photography, natural lighting, sharp focus, 8k resolution"
+5. Do NOT mention: text, logos, watermarks, UI elements, or brand names.
+6. Length: 25-40 words total.
+
+COMPOSITION GUIDES BY CATEGORY:
+{composition_table}
 
 Input:
 {json.dumps(entries, indent=2)}
@@ -275,10 +383,23 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
             try:
                 seed = int(d_str.replace("-", "")) % 2147483647
                 img_bytes = _generate_image_bytes(prompt, seed=seed)
+
+                # Visual QA via Gemini Flash — runs before upload so reason is logged
+                qa_passed, qa_reason = _qa_image_gemini(img_bytes, cat, topic)
+                if qa_passed:
+                    print(f"          ✓ QA passed: {qa_reason or 'looks good'}")
+                else:
+                    print(
+                        f"          ✗ QA FAILED: {qa_reason}",
+                        file=sys.stderr,
+                    )
+
+                # Always upload — failed images go to Supabase for manual review
                 filename = f"blog/{d_str}-{cat.lower().replace(' ', '-')}.jpg"
                 image_url = _upload_to_supabase(supabase, img_bytes, filename)
-                image_status = "generated"
-                print(f"          → uploaded: {image_url[:80]}")
+                image_status = "generated" if qa_passed else "failed_qa"
+                status_label = "uploaded" if qa_passed else "uploaded (failed_qa — won't be used)"
+                print(f"          → {status_label}: {image_url[:80]}")
             except Exception as exc:
                 print(f"          ✗ FAILED: {exc}", file=sys.stderr)
                 image_status = "failed"
@@ -312,10 +433,15 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
         for r in results:
             print(f"  {r['scheduled_date']} | {r['category']} | {r['topic'][:60]}")
 
-    generated = sum(1 for r in results if r["image_status"] == "generated")
-    failed    = sum(1 for r in results if r["image_status"] == "failed")
-    print(f"\n[calendar] Summary: {generated} generated, {failed} failed out of {len(results)}")
-    return 1 if failed > 0 else 0
+    generated  = sum(1 for r in results if r["image_status"] == "generated")
+    failed_qa  = sum(1 for r in results if r["image_status"] == "failed_qa")
+    failed     = sum(1 for r in results if r["image_status"] == "failed")
+    print(
+        f"\n[calendar] Summary: {generated} generated (QA passed), "
+        f"{failed_qa} failed QA (uploaded for review), "
+        f"{failed} failed entirely — out of {len(results)}"
+    )
+    return 1 if (failed > 0 or failed_qa > 0) else 0
 
 
 if __name__ == "__main__":

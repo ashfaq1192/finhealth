@@ -116,12 +116,19 @@ def build_tasks(
         description=(
             f"The economic indicators have already been fetched from FRED for {today}. "
             f"Here is the raw data JSON:\n\n{indicators_json}\n\n"
-            "Validate that all six indicators are present: dprime, drtscilm, drtscis, "
-            "t10y2y, icsa, busappwnsaus. Output the validated JSON unchanged."
+            "Validate ALL of the following before passing data downstream:\n"
+            "1. All six keys present: dprime, drtscilm, drtscis, t10y2y, icsa, busappwnsaus\n"
+            "2. All values are numbers (not null, not string, not zero unless genuinely zero)\n"
+            "3. Plausible ranges: dprime 3-15%, t10y2y -3 to +4, icsa 150000-800000, "
+            "busappwnsaus 30000-100000, drtscilm/drtscis between -30 and 80\n"
+            "If all checks pass: output the validated JSON unchanged. "
+            "If any check fails: output the JSON with a top-level 'validation_warnings' "
+            "array listing exactly which indicators failed and why."
         ),
         expected_output=(
-            "A JSON object containing the six FRED indicator values for today, "
-            "validated and ready for economic analysis."
+            "A validated JSON object with all six FRED indicator values. "
+            "If any value is suspicious, include a 'validation_warnings' array. "
+            "No transformation of the data — output it as received."
         ),
         agent=data_fetcher_agent,
     )
@@ -130,27 +137,33 @@ def build_tasks(
         description=(
             f"Using the scoring results for {today}:\n\n{score_json}\n\n"
             "Write exactly SIX reasoning bullets for the Business Funding Climate Score. "
-            "CRITICAL RULES:\n"
-            "- Each bullet MUST explain WHY an indicator is moving and what mechanism "
-            "  connects it to small business credit access — not just WHAT it is doing.\n"
-            "- Cover all six FRED indicators across the six bullets (prime rate, yield curve, "
-            "  C&I tightening large firms, C&I tightening small firms, jobless claims, business apps).\n"
-            "- Never repeat the same observation in different words across bullets.\n"
-            "- Always include the actual numeric value with its unit (%, basis points, etc.).\n"
-            "- Each bullet is exactly 2 sentences, max 55 words total. "
-            "  First sentence: the indicator's current value and direction. "
-            "  Second sentence: the specific real-world mechanism connecting it to "
-            "  small business loan access, approval rates, or borrowing cost.\n\n"
-            "GOOD example: 'The prime rate stands at 8.5%, sitting 350 basis points above "
-            "its pre-2022 baseline of 5%. This directly raises the floor on every "
-            "variable-rate SBA 7(a) loan, adding hundreds of dollars per month to "
-            "repayment costs for thin-margin businesses.'\n"
-            "BAD example: 'Lenders are becoming more cautious about lending to businesses.'\n\n"
-            "Format: a JSON array of exactly 6 strings."
+            "Each bullet covers one of the six FRED indicators: prime rate (dprime), "
+            "yield curve spread (t10y2y), C&I standards large firms (drtscilm), "
+            "C&I standards small firms (drtscis), jobless claims (icsa), "
+            "business applications (busappwnsaus).\n\n"
+            "MANDATORY STRUCTURE for each bullet (2 sentences, max 55 words):\n"
+            "  Sentence 1: State the indicator's current value with unit and direction.\n"
+            "  Sentence 2: Trace the TRANSMISSION CHAIN — explain the specific economic "
+            "  mechanism by which this number affects small business loan approval rates, "
+            "  borrowing costs, or credit availability. Name the mechanism, not the outcome.\n\n"
+            "TRANSMISSION CHAIN examples by indicator:\n"
+            "  prime rate → variable-rate loan floor → monthly repayment cost on SBA 7(a)\n"
+            "  t10y2y negative → bank net interest margin compression → risk appetite falls → "
+            "  tighter underwriting on small business lines of credit\n"
+            "  drtscilm tightening → large-firm credit crowding out → banks reallocate "
+            "  remaining capital to lower-risk large borrowers, squeezing small firm allocations\n"
+            "  icsa rising → consumer spending signal → retail/service small business "
+            "  revenue projections fall → lender cash-flow coverage ratios tighten\n\n"
+            "REJECT any bullet that:\n"
+            "  - Says only what is happening without explaining the mechanism\n"
+            "  - Uses vague language: 'lenders are cautious', 'conditions are challenging'\n"
+            "  - Omits the numeric value and unit\n\n"
+            "Output: a JSON array of exactly 6 strings."
         ),
         expected_output=(
-            'A JSON array of exactly 6 strings, each a specific causal sentence with '
-            'indicator values and units, e.g. ["Bullet 1.", "Bullet 2.", "Bullet 3.", "Bullet 4.", "Bullet 5.", "Bullet 6."]'
+            "A JSON array of exactly 6 strings. Each string is a 2-sentence, max-55-word "
+            "causal bullet: sentence 1 states the indicator value with unit, sentence 2 "
+            "names the transmission mechanism connecting it to small business credit access."
         ),
         agent=economist_agent,
     )
