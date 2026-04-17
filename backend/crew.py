@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import time
+import traceback
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Callable, TypeVar
@@ -87,10 +88,12 @@ def _retry(fn: Callable[[], _T], *, attempts: int, delays: list[int], label: str
             last_exc = exc
             if i < attempts - 1:
                 wait = delays[min(i, len(delays) - 1)]
+                exc_msg = repr(exc) if not str(exc).strip() else str(exc)
                 print(
-                    f"[retry] {label} — attempt {i + 1}/{attempts} failed: {exc}. "
+                    f"[retry] {label} — attempt {i + 1}/{attempts} failed: {exc_msg}. "
                     f"Retrying in {wait}s...",
                     file=sys.stderr,
+                    flush=True,
                 )
                 time.sleep(wait)
     raise last_exc  # type: ignore[misc]
@@ -197,7 +200,7 @@ def _fetch_calendar_entry(supabase_client, today: str) -> dict | None:
 def run() -> int:
     """Execute the full pipeline. Returns 0 on success, 1 on failure."""
     today = datetime.now(timezone.utc).date().isoformat()
-    print(f"[crew] Starting pipeline for {today}")
+    print(f"[crew] Starting pipeline for {today}", flush=True)
 
     # Step 0: Check content_calendar for a pre-planned topic + pre-generated hero image
     # This runs early so the topic can influence the CrewAI writing task below.
@@ -208,9 +211,24 @@ def run() -> int:
     )
     calendar_entry = _fetch_calendar_entry(supabase, today)
     if calendar_entry:
-        print(f"[crew] Content calendar entry found: {calendar_entry.get('topic', '')[:80]}")
+        print(f"[crew] Content calendar entry found: {calendar_entry.get('topic', '')[:80]}", flush=True)
     else:
-        print("[crew] No content calendar entry for today — using default category rotation")
+        print("[crew] No content calendar entry for today — using default category rotation", flush=True)
+
+    # Step 0b: Verify Groq API is reachable before spending 3 FRED calls on a doomed run
+    try:
+        from groq import Groq as _Groq
+        _groq_test = _Groq(api_key=os.environ["GROQ_API_KEY"])
+        _groq_test.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+        )
+        print("[crew] Groq API connectivity: OK", flush=True)
+    except Exception as _groq_exc:
+        print(f"[crew] FATAL: Groq API test failed: {_groq_exc}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
+        return 1
 
     # Step 1: Fetch FRED indicators — 3 attempts, 10s / 30s gaps
     # FRED is a public government API; occasional 503s or slow responses are the typical failure.
@@ -222,7 +240,7 @@ def run() -> int:
             label="FRED fetch",
         )
         print(f"[crew] FRED indicators fetched: dprime={indicators['dprime']}, "
-              f"t10y2y={indicators['t10y2y']}, icsa={indicators['icsa']}")
+              f"t10y2y={indicators['t10y2y']}, icsa={indicators['icsa']}", flush=True)
     except Exception as exc:
         print(f"[crew] FATAL: Could not fetch FRED indicators after 3 attempts: {exc}", file=sys.stderr)
         return 1
@@ -231,7 +249,7 @@ def run() -> int:
     try:
         score_result = calculate_score(indicators)
         print(f"[crew] Score calculated: {score_result['health_score']} "
-              f"({score_result['status_label']})")
+              f"({score_result['status_label']})", flush=True)
     except Exception as exc:
         print(f"[crew] FATAL: Score calculation failed: {exc}", file=sys.stderr)
         return 1
@@ -276,9 +294,9 @@ def run() -> int:
         if not editor_output:
             editor_output = getattr(getattr(editor_task, "output", None), "raw", "") or ""
 
-        print(f"[crew] Economist output preview: {economist_output[:120]}")
-        print(f"[crew] Writer output preview: {writer_output[:120]}")
-        print(f"[crew] Editor output preview: {editor_output[:120]}")
+        print(f"[crew] Economist output preview: {economist_output[:120]}", flush=True)
+        print(f"[crew] Writer output preview: {writer_output[:120]}", flush=True)
+        print(f"[crew] Editor output preview: {editor_output[:120]}", flush=True)
 
         # Parse reasoning bullets from economist task output
         try:
@@ -322,7 +340,10 @@ def run() -> int:
                 )
 
     except Exception as exc:
-        print(f"[crew] CrewAI pipeline error: {exc}", file=sys.stderr)
+        exc_repr = repr(exc) if not str(exc).strip() else str(exc)
+        print(f"[crew] CrewAI pipeline error: {exc_repr}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         # Continue — score can be saved without the blog post
         reasoning = [
             f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",

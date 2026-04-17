@@ -34,7 +34,8 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SITE_URL: ${{ secrets.SITE_URL }}
-        run: python backend/crew.py
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -u backend/crew.py
 
       - name: Write job summary on success
         if: success()
