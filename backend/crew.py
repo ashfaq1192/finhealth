@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import time
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Callable, TypeVar
 
@@ -146,6 +147,32 @@ def _qa_post_content(post_data: dict) -> tuple[bool, str]:
     if h3_count < 1:
         return False, "No FAQ H3 questions found (minimum 1)"
 
+    return True, ""
+
+
+def _qa_image_url(url: str, min_bytes: int = 10_000) -> tuple[bool, str]:
+    """
+    Verify a hero image URL is reachable and looks like a real image.
+    Uses a HEAD request (no body download). Returns (passed, reason).
+    """
+    if not url or not url.startswith("https://"):
+        return False, f"Invalid URL scheme: {url!r}"
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        req.add_header("User-Agent", "FinHealthBot/1.0 image-qa")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = resp.status
+            content_type = resp.headers.get("Content-Type", "")
+            content_length = int(resp.headers.get("Content-Length", "0") or "0")
+    except Exception as exc:
+        return False, f"HTTP request failed: {exc}"
+
+    if status != 200:
+        return False, f"HTTP {status} (expected 200)"
+    if not content_type.startswith("image/"):
+        return False, f"Unexpected Content-Type: {content_type!r}"
+    if content_length > 0 and content_length < min_bytes:
+        return False, f"Image too small: {content_length} bytes (minimum {min_bytes})"
     return True, ""
 
 
@@ -384,12 +411,24 @@ def run() -> int:
                 calendar_entry.get("category") if calendar_entry
                 else get_todays_category()
             )
-            # Use pre-generated hero image from calendar if available
+            # Use pre-generated hero image from calendar if available — QA it first
             hero_image_url = (
                 calendar_entry.get("image_url")
                 if calendar_entry and calendar_entry.get("image_status") == "generated"
                 else None
             )
+            if hero_image_url:
+                img_ok, img_reason = _qa_image_url(hero_image_url)
+                if img_ok:
+                    print(f"[crew] Image QA passed: {hero_image_url}")
+                else:
+                    print(
+                        f"[crew] Image QA FAILED ({img_reason}). "
+                        "Publishing post without hero image.",
+                        file=sys.stderr,
+                    )
+                    hero_image_url = None
+
             post_row = {
                 "date": today,
                 "title": post_data.get("title", f"Business Funding Climate: {today}"),
