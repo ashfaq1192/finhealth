@@ -8,46 +8,46 @@ import os
 from crewai import Agent, LLM
 
 
-def _llm() -> LLM:
-    """Create a CrewAI LLM instance routed to Groq via LiteLLM."""
+def _fast_llm(max_tokens: int = 1500) -> LLM:
+    """
+    llama-3.1-8b-instant — 20,000 TPM free tier (vs 6,000 for 70b).
+    Used for data_fetcher and economist: structured JSON output, not prose.
+    """
+    return LLM(
+        model="groq/llama-3.1-8b-instant",
+        api_key=os.environ["GROQ_API_KEY"],
+        temperature=0.2,
+        max_tokens=max_tokens,
+    )
+
+
+def _quality_llm(max_tokens: int = 6000) -> LLM:
+    """
+    llama-3.3-70b-versatile — quality-critical prose tasks (writer, editor).
+    Kept at 6,000 TPM pool; writer+editor run sequentially so they don't overlap.
+    """
     return LLM(
         model="groq/llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
         temperature=0.3,
-        max_tokens=8000,
-    )
-
-
-def _editor_llm() -> LLM:
-    """Higher token budget for the editor — must output a full polished article."""
-    return LLM(
-        model="groq/llama-3.3-70b-versatile",
-        api_key=os.environ["GROQ_API_KEY"],
-        temperature=0.2,
-        max_tokens=8000,
+        max_tokens=max_tokens,
     )
 
 
 data_fetcher_agent = Agent(
     role="Federal Reserve Data Analyst",
     goal=(
-        "Retrieve and validate all six US economic indicator values from the FRED dataset. "
-        "Every value must be a real number within a plausible range — never null, stale, "
-        "or out-of-bounds. Return clean structured JSON ready for downstream scoring. "
-        "If any indicator looks wrong, flag it explicitly rather than silently passing bad data."
+        "Validate all six US economic indicator values from the FRED dataset. "
+        "Return clean structured JSON. Flag any value outside plausible range."
     ),
     backstory=(
-        "You are a quantitative analyst at the Federal Reserve Bank of Atlanta with 10 years "
-        "pulling and validating FRED time series for macroeconomic research. You know these "
-        "series intimately: DPRIME (prime rate) historically sits between 3% and 15%; "
-        "T10Y2Y (10Y-2Y spread) ranges from -3 to +4 percentage points; ICSA (initial jobless "
-        "claims) runs between 150,000 and 800,000 per week; BUSAPPWNSAUS (weekly business "
-        "applications) sits between 30,000 and 100,000. "
-        "When a value lands outside these bands you flag it immediately — you never let "
-        "garbage data corrupt a downstream model. You output clean, validated JSON and "
-        "write exclusively in American English."
+        "Quantitative analyst at the Federal Reserve Bank of Atlanta with 10 years "
+        "validating FRED time series. You know plausible ranges: DPRIME 3–15%, "
+        "T10Y2Y -3 to +4, ICSA 150k–800k, BUSAPPWNSAUS 30k–100k. "
+        "Output clean validated JSON. Write exclusively in American English."
     ),
-    llm=_llm(),
+    llm=_fast_llm(max_tokens=600),
+    max_iter=2,
     verbose=False,
     allow_delegation=False,
 )
@@ -55,27 +55,19 @@ data_fetcher_agent = Agent(
 economist_agent = Agent(
     role="Senior US Macroeconomist",
     goal=(
-        "Write exactly six causal reasoning bullets that explain WHY today's Business "
-        "Funding Climate Score is what it is. Not what the indicators show — WHY they matter. "
-        "Each bullet must trace the full transmission chain from the indicator's current value "
-        "to its real-world effect on a small business owner trying to get a loan approved "
-        "or a line of credit renewed on Main Street today."
+        "Write exactly six causal reasoning bullets explaining WHY today's Business "
+        "Funding Climate Score is what it is. Each bullet traces the transmission chain "
+        "from indicator value → real-world effect on a small business owner today."
     ),
     backstory=(
-        "You hold a PhD in Economics from the University of Chicago and spent 15 years as a "
-        "senior analyst at the Federal Reserve Bank of Atlanta studying small business credit "
-        "markets. You think exclusively in transmission mechanisms. When the prime rate rises, "
-        "your first question is: 'Is this Fed-driven, inflation-expectation-driven, or bank "
-        "balance-sheet pressure — and which channel hits small business lending first?' "
-        "When C&I standards tighten, you ask: 'Are lenders reacting to rising default risk, "
-        "declining collateral values, or narrowing net interest margins?' "
-        "You have never written a vague sentence like 'lenders are cautious' in your career — "
-        "it would embarrass you professionally. Every claim cites the actual indicator value "
-        "with its unit, then immediately explains the mechanism connecting it to loan approval "
-        "rates, borrowing costs, or credit availability for small firms. "
-        "You write exclusively in American English: 'labor' not 'labour', 'analyze' not 'analyse'."
+        "PhD Economist, 15 years at the Federal Reserve Bank of Atlanta studying small "
+        "business credit markets. You think in transmission mechanisms — never vague phrases "
+        "like 'lenders are cautious'. Every claim cites the actual value with unit, then "
+        "explains the mechanism connecting it to loan approval rates or borrowing costs. "
+        "Write exclusively in American English: 'labor', 'analyze', not British variants."
     ),
-    llm=_llm(),
+    llm=_fast_llm(max_tokens=1200),
+    max_iter=2,
     verbose=False,
     allow_delegation=False,
 )
@@ -105,7 +97,8 @@ writer_agent = Agent(
         "every variable-rate SBA loan just got more expensive to carry.' "
         "Your credibility comes from specificity and data, never from reassurance."
     ),
-    llm=_llm(),
+    llm=_quality_llm(max_tokens=5000),
+    max_iter=2,
     verbose=False,
     allow_delegation=False,
 )
@@ -137,7 +130,8 @@ editor_agent = Agent(
         "Never invent new facts or alter economic substance. "
         "Write and edit exclusively in American English."
     ),
-    llm=_editor_llm(),
+    llm=_quality_llm(max_tokens=5500),
+    max_iter=2,
     verbose=False,
     allow_delegation=False,
 )
