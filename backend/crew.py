@@ -33,10 +33,10 @@ load_dotenv()
 
 from fred import fetch_all_indicators
 from scoring import calculate_score
-from tasks import build_tasks, get_todays_category
+from tasks import build_tasks, build_editor_task, get_todays_category
 
 from crewai import Crew, Process
-from agents import economist_agent, writer_agent
+from agents import economist_agent, writer_agent, editor_agent
 from digest import send_daily_digest
 
 
@@ -257,13 +257,14 @@ def run() -> int:
     indicators_json = json.dumps(indicators, indent=2)
     score_json = json.dumps(score_result, indent=2)
 
-    # Step 3: Run CrewAI for reasoning bullets + blog post
-    # 3 attempts with 60s / 120s gaps — Groq free-tier rate limits reset in ~60s windows.
-    # Each retry builds a completely fresh Crew + Task objects so no stale state is carried over.
+    # Step 3 — Crew 1: economist (8b, 20K TPM pool) + writer (70b, 6K TPM pool)
+    # These two agents use SEPARATE Groq TPM pools — no rate conflict within Crew 1.
+    economist_output = ""
+    writer_output = ""
     try:
-        _crew_result: dict[str, Any] = {}
+        _crew1_result: dict[str, Any] = {}
 
-        def _kickoff_crew() -> None:
+        def _kickoff_crew1() -> None:
             topic_override = calendar_entry.get("topic") if calendar_entry else None
             et, wt = build_tasks(indicators_json, score_json, topic_override=topic_override)
             c = Crew(
@@ -272,20 +273,18 @@ def run() -> int:
                 process=Process.sequential,
                 verbose=False,
             )
-            _crew_result["output"] = c.kickoff()
-            _crew_result["tasks"] = (et, wt)
+            _crew1_result["output"] = c.kickoff()
+            _crew1_result["tasks"] = (et, wt)
 
-        _retry(_kickoff_crew, attempts=3, delays=[60, 120], label="CrewAI/Groq kickoff")
+        _retry(_kickoff_crew1, attempts=3, delays=[60, 120], label="Crew1/writer kickoff")
 
-        result = _crew_result["output"]
-        economist_task, writer_task = _crew_result["tasks"]
+        result1 = _crew1_result["output"]
+        economist_task, writer_task = _crew1_result["tasks"]
 
-        # In CrewAI 1.x, task outputs are in result.tasks_output list
-        tasks_output = getattr(result, "tasks_output", [])
-        economist_output = tasks_output[0].raw if len(tasks_output) > 0 else ""
-        writer_output = tasks_output[1].raw if len(tasks_output) > 1 else ""
+        tasks_output1 = getattr(result1, "tasks_output", [])
+        economist_output = tasks_output1[0].raw if len(tasks_output1) > 0 else ""
+        writer_output   = tasks_output1[1].raw if len(tasks_output1) > 1 else ""
 
-        # Fallback: try direct task.output attribute (older CrewAI compat)
         if not economist_output:
             economist_output = getattr(getattr(economist_task, "output", None), "raw", "") or ""
         if not writer_output:
@@ -294,43 +293,21 @@ def run() -> int:
         print(f"[crew] Economist output preview: {economist_output[:120]}", flush=True)
         print(f"[crew] Writer output preview: {writer_output[:120]}", flush=True)
 
-        # Parse reasoning bullets from economist task output
-        try:
-            reasoning = _parse_json_output(economist_output)
-            if not isinstance(reasoning, list):
-                reasoning = [str(reasoning)]
-            reasoning = reasoning[:6]
-            while len(reasoning) < 6:
-                reasoning.append("Economic conditions are being monitored.")
-        except Exception:
-            reasoning = [
-                f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",
-                f"Treasury yield spread at {indicators['t10y2y']}% signals credit market conditions.",
-                f"Weekly jobless claims at {int(indicators['icsa']):,} reflect labor market health.",
-                f"C&I tightening for large firms at {indicators['drtscilm']}% tightens overall credit supply.",
-                f"C&I tightening for small firms at {indicators['drtscis']}% directly constrains small business lending.",
-                f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",
-            ]
-
-        # Parse blog post from writer output
-        post_data = None
-        if writer_output:
-            try:
-                post_data = _parse_json_output(writer_output)
-                print("[crew] Writer output parsed successfully.", flush=True)
-            except Exception as exc:
-                print(
-                    f"[crew] WARNING: Could not parse writer output: {exc}. "
-                    f"Raw preview: {writer_output[:300]!r}",
-                    file=sys.stderr,
-                )
-
     except Exception as exc:
         exc_repr = repr(exc) if not str(exc).strip() else str(exc)
-        print(f"[crew] CrewAI pipeline error: {exc_repr}", file=sys.stderr, flush=True)
+        print(f"[crew] Crew1 error: {exc_repr}", file=sys.stderr, flush=True)
         traceback.print_exc(file=sys.stderr)
         sys.stderr.flush()
-        # Continue — score can be saved without the blog post
+
+    # Parse reasoning bullets (used for score display regardless of blog outcome)
+    try:
+        reasoning = _parse_json_output(economist_output)
+        if not isinstance(reasoning, list):
+            reasoning = [str(reasoning)]
+        reasoning = reasoning[:6]
+        while len(reasoning) < 6:
+            reasoning.append("Economic conditions are being monitored.")
+    except Exception:
         reasoning = [
             f"Prime rate stands at {indicators['dprime']}%, affecting small business borrowing costs.",
             f"Treasury yield spread at {indicators['t10y2y']}% signals credit market conditions.",
@@ -339,7 +316,75 @@ def run() -> int:
             f"C&I tightening for small firms at {indicators['drtscis']}% directly constrains small business lending.",
             f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",
         ]
-        post_data = None
+
+    # Step 3b — Crew 2: editor (70b, 6K TPM pool)
+    # Runs in a SEPARATE crew after a 75s sleep so the 70b TPM window resets fully.
+    # The writer draft is embedded directly in the editor task description — no CrewAI
+    # context accumulation — giving the editor a clean, bounded prompt every time.
+    post_data = None
+    if writer_output:
+        category_for_editor = (
+            calendar_entry.get("category") if calendar_entry else get_todays_category()
+        )
+        from tasks import CATEGORY_SEO as _CSEO
+        primary_kw = _CSEO.get(category_for_editor, {}).get("primary", "small business funding")
+
+        print("[crew] Waiting 75s for Groq 70b TPM window to reset before editor...", flush=True)
+        time.sleep(75)
+
+        try:
+            _crew2_result: dict[str, Any] = {}
+
+            def _kickoff_crew2() -> None:
+                edt = build_editor_task(writer_output, score_json, category_for_editor, primary_kw)
+                c = Crew(
+                    agents=[editor_agent],
+                    tasks=[edt],
+                    process=Process.sequential,
+                    verbose=False,
+                )
+                _crew2_result["output"] = c.kickoff()
+                _crew2_result["task"] = edt
+
+            _retry(_kickoff_crew2, attempts=2, delays=[75], label="Crew2/editor kickoff")
+
+            result2 = _crew2_result["output"]
+            editor_task_obj = _crew2_result["task"]
+
+            tasks_output2 = getattr(result2, "tasks_output", [])
+            editor_output = tasks_output2[0].raw if len(tasks_output2) > 0 else ""
+            if not editor_output:
+                editor_output = getattr(getattr(editor_task_obj, "output", None), "raw", "") or ""
+
+            print(f"[crew] Editor output preview: {editor_output[:120]}", flush=True)
+
+            if editor_output:
+                try:
+                    post_data = _parse_json_output(editor_output)
+                    print("[crew] Using editor-polished article.", flush=True)
+                except Exception as exc:
+                    print(
+                        f"[crew] WARNING: Editor output unparseable: {exc}. "
+                        f"Raw: {editor_output[:300]!r}",
+                        file=sys.stderr,
+                    )
+
+        except Exception as exc:
+            exc_repr = repr(exc) if not str(exc).strip() else str(exc)
+            print(f"[crew] Crew2/editor failed: {exc_repr} — falling back to writer draft.", file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+
+    # Fall back to writer draft if editor failed or produced unparseable output
+    if post_data is None and writer_output:
+        try:
+            post_data = _parse_json_output(writer_output)
+            print("[crew] Using writer draft (editor unavailable).", flush=True)
+        except Exception as exc:
+            print(
+                f"[crew] WARNING: Could not parse writer output either: {exc}. "
+                f"Raw: {writer_output[:300]!r}",
+                file=sys.stderr,
+            )
 
     # Step 3a: Strip AI-generated word count line before saving (safety net)
     if post_data:
@@ -461,7 +506,28 @@ def run() -> int:
                 delays=[5, 15],
                 label="Supabase blog post upsert",
             )
-            print(f"[crew] Blog post upserted to blog_posts for {today}")
+            print(f"[crew] Blog post upserted to blog_posts for {today}", flush=True)
+
+            # Post-publish verification: fetch the live URL and confirm the article is accessible
+            _site_url = os.environ.get("SITE_URL", "https://usfundingclimate.com").rstrip("/")
+            _live_url = f"{_site_url}/blog/{sanitized_slug}"
+            try:
+                time.sleep(4)  # brief pause for Cloudflare edge propagation
+                _req = urllib.request.Request(_live_url)
+                _req.add_header("User-Agent", "FinHealthBot/1.0 publish-verify")
+                with urllib.request.urlopen(_req, timeout=20) as _resp:
+                    _html = _resp.read().decode("utf-8", errors="replace")
+                    _title_fragment = post_row["title"][:40]
+                    if _title_fragment in _html:
+                        print(f"[crew] PUBLISH VERIFIED: {_live_url} — title found in HTML ✓", flush=True)
+                    else:
+                        print(
+                            f"[crew] WARNING: {_live_url} returned 200 but title not found in HTML. "
+                            "Article may still be propagating.",
+                            file=sys.stderr,
+                        )
+            except Exception as _ve:
+                print(f"[crew] WARNING: Could not verify published URL {_live_url}: {_ve}", file=sys.stderr)
 
             # Mark calendar entry as used
             if calendar_entry and calendar_entry.get("id"):

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from crewai import Task
 
-from agents import economist_agent, writer_agent
+from agents import economist_agent, writer_agent, editor_agent
 
 CATEGORIES = ["Trucking", "Retail", "SBA Loans", "Macro", "Staffing"]
 
@@ -293,3 +293,95 @@ def build_tasks(
     )
 
     return economist_task, writer_task
+
+
+def build_editor_task(
+    writer_draft: str,
+    score_json: str,
+    category: str,
+    primary_keyword: str,
+) -> Task:
+    """
+    Build the editor task for Crew 2, with the writer's draft embedded directly.
+    Runs in a separate Crew call (after a 75s TPM-reset sleep) to avoid 70b rate limits.
+
+    The editor has exactly 6 non-negotiable checks. The instructions are precise
+    and bounded so the 70b model stays on task without producing a summary.
+    """
+    import json as _json
+    score_data = _json.loads(score_json)
+    score_val = score_data.get("health_score", "N/A")
+    score_label = score_data.get("status_label", "N/A")
+
+    return Task(
+        description=(
+            "You are the final editorial gate before this article goes live. "
+            "Below is the writer's draft JSON (title, slug, meta_description, content). "
+            "Apply the six checks below in order. Fix every failure you find. "
+            "Return ONLY the improved JSON — no commentary, no code fences, no preamble.\n\n"
+            f"GROUND TRUTH (fact-check all numbers against this):\n{score_json}\n"
+            f"  Score: {score_val} ({score_label})\n\n"
+            f"PRIMARY KEYWORD: \"{primary_keyword}\"\n"
+            f"INDUSTRY: {category}\n\n"
+            "━━━ CHECK 1 — OPENING HOOK (highest priority) ━━━\n"
+            "The first two sentences must create immediate urgency for a small business owner.\n"
+            "REWRITE the opener if it begins with ANY of these patterns:\n"
+            "  'In today's...' / 'As a small business owner...' / 'In the current...'\n"
+            "  'In an era...' / 'Navigating...' / Any rhetorical question opener\n"
+            "Good example: 'Getting approved for a trucking loan just got harder, "
+            "and the prime rate is only part of the story.'\n\n"
+            "━━━ CHECK 2 — ANTI-AI LANGUAGE ━━━\n"
+            "Find and replace EVERY instance of these throughout the article:\n"
+            "  Banned verbs: delve→explore, leverage→use, navigate→handle,\n"
+            "    bolster→strengthen, facilitate→help, foster→build,\n"
+            "    streamline→simplify, underscore→highlight, enhance→improve.\n"
+            "  Banned adjectives: robust→strong, comprehensive→complete,\n"
+            "    pivotal→key, seamless→smooth, holistic→complete,\n"
+            "    vital/crucial→important, transformative→significant.\n"
+            "  Banned transitions: furthermore/moreover→also,\n"
+            "    'that being said'→but, 'it is worth noting that'→(delete, state directly),\n"
+            "    'in conclusion'→(delete, end on the FAQ).\n"
+            "  Em dashes (—): replace EVERY one with a comma or colon.\n"
+            "  Filler: delete 'absolutely', 'essentially', 'simply', 'truly', 'ultimately',\n"
+            "    'undoubtedly' wherever they add no meaning.\n\n"
+            "━━━ CHECK 3 — FACT ACCURACY ━━━\n"
+            "Every number in the article must match the ground truth data exactly.\n"
+            "Every number must have its unit (%, basis points, $, count) AND\n"
+            "a one-sentence plain-English explanation of what it means for a business owner.\n"
+            "Example: '6.75%, the prime rate as of today, raises the floor on every "
+            "variable-rate SBA loan by the same amount.'\n\n"
+            "━━━ CHECK 4 — WORD COUNT ━━━\n"
+            "The content field must be 1,100-1,500 words.\n"
+            "If UNDER 1,100 words: expand each FAQ answer to 4-5 sentences citing at least "
+            "one specific indicator value. Expand the Practical Implications section with "
+            "one additional short paragraph.\n"
+            "If OVER 1,500 words: cut the most generic sentence from each body section.\n"
+            "NEVER write the word count in the output.\n\n"
+            "━━━ CHECK 5 — AMERICAN ENGLISH ━━━\n"
+            "Fix: labour→labor, analyse→analyze, colour→color, centre→center,\n"
+            "  whilst→while, realise→realize, optimise→optimize, 'high street'→'Main Street'.\n\n"
+            "━━━ CHECK 6 — STRUCTURE & SEO ━━━\n"
+            "Confirm all of these are present. Fix anything missing:\n"
+            "  - Title: evergreen (no year, no 'today'), under 65 chars, contains primary keyword.\n"
+            "  - Meta description: exactly one sentence, ends with period, max 140 chars, "
+            "    primary keyword present.\n"
+            "  - Slug: lowercase, hyphens only, no dates, max 60 chars.\n"
+            "  - Primary keyword appears in: first 50 words, one H2 heading, meta description, "
+            "    final paragraph.\n"
+            "  - At least 2 internal links present in the content.\n"
+            "  - 3 FAQ H3 questions present, each answered in 3-5 sentences.\n"
+            "  - No H1 in content (title is rendered separately by the CMS).\n\n"
+            "━━━ OUTPUT FORMAT ━━━\n"
+            "Output ONLY a valid JSON object. Zero code fences. Zero commentary.\n"
+            "Exactly 4 keys in this order: title, slug, meta_description, content.\n\n"
+            f"━━━ WRITER'S DRAFT ━━━\n{writer_draft}"
+        ),
+        expected_output=(
+            "A valid JSON object with exactly 4 keys: "
+            "title (evergreen, under 65 chars, primary keyword), "
+            "slug (lowercase hyphens, no dates, max 60 chars), "
+            "meta_description (one sentence, period, max 140 chars, primary keyword), "
+            "content (1,100-1,500 word publication-ready markdown, no H1, no code fences)."
+        ),
+        agent=editor_agent,
+    )

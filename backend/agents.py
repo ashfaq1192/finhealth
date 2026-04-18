@@ -1,10 +1,13 @@
 """
 CrewAI agent definitions.
-Uses CrewAI native LLM class with LiteLLM routing to Groq.
 
-Two-agent design to stay within Groq free-tier rate limits:
-  economist_agent → llama-3.1-8b-instant (20,000 TPM) — structured JSON bullets
-  writer_agent    → llama-3.3-70b-versatile (6,000 TPM)  — quality prose article
+TPM-safe two-pool design (Groq free tier):
+  economist_agent → llama-3.1-8b-instant  (20,000 TPM) — structured JSON bullets
+  writer_agent    → llama-3.3-70b-versatile (6,000 TPM) — quality prose draft
+  editor_agent    → llama-3.3-70b-versatile (6,000 TPM) — polished final article
+
+Writer and editor share the 70b pool but run in SEPARATE Crew calls with a
+75-second sleep between them so each runs in a fresh TPM window.
 """
 
 import os
@@ -13,7 +16,7 @@ from crewai import Agent, LLM
 
 
 def _fast_llm(max_tokens: int = 1500) -> LLM:
-    """llama-3.1-8b-instant — 20,000 TPM free tier. Structured JSON output tasks."""
+    """llama-3.1-8b-instant — 20,000 TPM. For structured JSON output tasks."""
     return LLM(
         model="groq/llama-3.1-8b-instant",
         api_key=os.environ["GROQ_API_KEY"],
@@ -23,7 +26,7 @@ def _fast_llm(max_tokens: int = 1500) -> LLM:
 
 
 def _quality_llm(max_tokens: int = 5000) -> LLM:
-    """llama-3.3-70b-versatile — 6,000 TPM free tier. Quality prose tasks."""
+    """llama-3.3-70b-versatile — 6,000 TPM. Quality prose tasks."""
     return LLM(
         model="groq/llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
@@ -76,6 +79,30 @@ writer_agent = Agent(
         "Your credibility comes from specificity and data, never from reassurance."
     ),
     llm=_quality_llm(max_tokens=5000),
+    max_iter=2,
+    verbose=False,
+    allow_delegation=False,
+)
+
+editor_agent = Agent(
+    role="Chief Editorial Director",
+    goal=(
+        "Apply exactly six editorial checks to the writer's draft and fix every failure. "
+        "Return a publication-ready JSON article. Never summarise or shorten — "
+        "preserve all substance and expand where the word count is low."
+    ),
+    backstory=(
+        "You are the Editorial Director of a major US financial media brand. "
+        "You have edited 3,000+ articles on SBA loans, invoice factoring, and small "
+        "business credit for Bloomberg Markets and Forbes Small Business. "
+        "You have a radar for AI-generated text: em dashes, 'delve', 'leverage', 'robust', "
+        "'seamless', 'furthermore', 'it is worth noting' — you replace them on sight. "
+        "Your non-negotiable rule: every sentence must say something a reader can only "
+        "find here, about today's specific data. Generic filler embarrasses you. "
+        "You are surgical: fix what is weak, preserve what is strong. Never invent new "
+        "facts or alter economic substance. Write and edit in American English only."
+    ),
+    llm=_quality_llm(max_tokens=5500),
     max_iter=2,
     verbose=False,
     allow_delegation=False,
