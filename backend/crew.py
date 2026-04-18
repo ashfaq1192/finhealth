@@ -364,18 +364,46 @@ def run() -> int:
             raw_content,
         ).rstrip()
 
-    # Step 3b: QA gate — reject posts that fail structural requirements
+    # Step 3b: QA gate — if editor output fails, fall back to writer output before giving up
     if post_data:
         qa_passed, qa_reason = _qa_post_content(post_data)
         if not qa_passed:
             print(
-                f"[crew] QA GATE FAILED: {qa_reason}. Blog post discarded.",
+                f"[crew] Editor output QA FAILED: {qa_reason}. Trying writer fallback.",
                 file=sys.stderr,
             )
-            post_data = None
+            # Try raw writer output as fallback
+            writer_fallback = None
+            if writer_output:
+                try:
+                    writer_fallback = _parse_json_output(writer_output)
+                    # Strip word count line from writer output too
+                    raw_wc = writer_fallback.get("content", "")
+                    writer_fallback["content"] = re.sub(
+                        r"\n*[Tt]he word count for this content is \d[\d,]* words\.?\s*$",
+                        "",
+                        raw_wc,
+                    ).rstrip()
+                except Exception:
+                    pass
+            if writer_fallback:
+                wf_qa_passed, wf_qa_reason = _qa_post_content(writer_fallback)
+                if wf_qa_passed:
+                    post_data = writer_fallback
+                    wc = len(post_data["content"].split())
+                    print(f"[crew] Writer fallback QA passed: {wc} words, structure OK.", flush=True)
+                else:
+                    print(
+                        f"[crew] Writer fallback also failed QA: {wf_qa_reason}. Blog post discarded.",
+                        file=sys.stderr,
+                    )
+                    post_data = None
+            else:
+                print("[crew] No writer output to fall back to. Blog post discarded.", file=sys.stderr)
+                post_data = None
         else:
             wc = len(post_data["content"].split())
-            print(f"[crew] QA gate passed: {wc} words, structure OK.")
+            print(f"[crew] QA gate passed: {wc} words, structure OK.", flush=True)
 
     # Step 4: Upsert to Supabase (client already created in Step 0)
     score_saved = False

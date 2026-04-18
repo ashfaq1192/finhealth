@@ -130,7 +130,7 @@ editor_agent = Agent(
         "Never invent new facts or alter economic substance. "
         "Write and edit exclusively in American English."
     ),
-    llm=_quality_llm(max_tokens=5500),
+    llm=_fast_llm(max_tokens=5500),
     max_iter=2,
     verbose=False,
     allow_delegation=False,
