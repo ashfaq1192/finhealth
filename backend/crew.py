@@ -36,7 +36,7 @@ from scoring import calculate_score
 from tasks import build_tasks, get_todays_category
 
 from crewai import Crew, Process
-from agents import data_fetcher_agent, economist_agent, writer_agent, editor_agent
+from agents import economist_agent, writer_agent
 from digest import send_daily_digest
 
 
@@ -265,38 +265,34 @@ def run() -> int:
 
         def _kickoff_crew() -> None:
             topic_override = calendar_entry.get("topic") if calendar_entry else None
-            ft, et, wt, edt = build_tasks(indicators_json, score_json, topic_override=topic_override)
+            et, wt = build_tasks(indicators_json, score_json, topic_override=topic_override)
             c = Crew(
-                agents=[data_fetcher_agent, economist_agent, writer_agent, editor_agent],
-                tasks=[ft, et, wt, edt],
+                agents=[economist_agent, writer_agent],
+                tasks=[et, wt],
                 process=Process.sequential,
                 verbose=False,
             )
             _crew_result["output"] = c.kickoff()
-            _crew_result["tasks"] = (ft, et, wt, edt)
+            _crew_result["tasks"] = (et, wt)
 
         _retry(_kickoff_crew, attempts=3, delays=[60, 120], label="CrewAI/Groq kickoff")
 
         result = _crew_result["output"]
-        fetch_task, economist_task, writer_task, editor_task = _crew_result["tasks"]
+        economist_task, writer_task = _crew_result["tasks"]
 
         # In CrewAI 1.x, task outputs are in result.tasks_output list
         tasks_output = getattr(result, "tasks_output", [])
-        economist_output = tasks_output[1].raw if len(tasks_output) > 1 else ""
-        writer_output = tasks_output[2].raw if len(tasks_output) > 2 else ""
-        editor_output = tasks_output[3].raw if len(tasks_output) > 3 else ""
+        economist_output = tasks_output[0].raw if len(tasks_output) > 0 else ""
+        writer_output = tasks_output[1].raw if len(tasks_output) > 1 else ""
 
         # Fallback: try direct task.output attribute (older CrewAI compat)
         if not economist_output:
             economist_output = getattr(getattr(economist_task, "output", None), "raw", "") or ""
         if not writer_output:
             writer_output = getattr(getattr(writer_task, "output", None), "raw", "") or ""
-        if not editor_output:
-            editor_output = getattr(getattr(editor_task, "output", None), "raw", "") or ""
 
         print(f"[crew] Economist output preview: {economist_output[:120]}", flush=True)
         print(f"[crew] Writer output preview: {writer_output[:120]}", flush=True)
-        print(f"[crew] Editor output preview: {editor_output[:120]}", flush=True)
 
         # Parse reasoning bullets from economist task output
         try:
@@ -316,25 +312,15 @@ def run() -> int:
                 f"Business applications at {int(indicators['busappwnsaus']):,} indicate entrepreneur activity levels.",
             ]
 
-        # Parse blog post from editor output (preferred), fall back to writer output
+        # Parse blog post from writer output
         post_data = None
-        if editor_output:
-            try:
-                post_data = _parse_json_output(editor_output)
-                print("[crew] Using editor-polished blog post.")
-            except Exception as exc:
-                print(
-                    f"[crew] WARNING: Could not parse editor output: {exc}. "
-                    f"Raw preview: {editor_output[:300]!r}",
-                    file=sys.stderr,
-                )
-        if post_data is None and writer_output:
+        if writer_output:
             try:
                 post_data = _parse_json_output(writer_output)
-                print("[crew] Fallback: using raw writer output (editor parse failed).")
+                print("[crew] Writer output parsed successfully.", flush=True)
             except Exception as exc:
                 print(
-                    f"[crew] WARNING: Could not parse writer output either: {exc}. "
+                    f"[crew] WARNING: Could not parse writer output: {exc}. "
                     f"Raw preview: {writer_output[:300]!r}",
                     file=sys.stderr,
                 )
@@ -364,43 +350,12 @@ def run() -> int:
             raw_content,
         ).rstrip()
 
-    # Step 3b: QA gate — if editor output fails, fall back to writer output before giving up
+    # Step 3b: QA gate
     if post_data:
         qa_passed, qa_reason = _qa_post_content(post_data)
         if not qa_passed:
-            print(
-                f"[crew] Editor output QA FAILED: {qa_reason}. Trying writer fallback.",
-                file=sys.stderr,
-            )
-            # Try raw writer output as fallback
-            writer_fallback = None
-            if writer_output:
-                try:
-                    writer_fallback = _parse_json_output(writer_output)
-                    # Strip word count line from writer output too
-                    raw_wc = writer_fallback.get("content", "")
-                    writer_fallback["content"] = re.sub(
-                        r"\n*[Tt]he word count for this content is \d[\d,]* words\.?\s*$",
-                        "",
-                        raw_wc,
-                    ).rstrip()
-                except Exception:
-                    pass
-            if writer_fallback:
-                wf_qa_passed, wf_qa_reason = _qa_post_content(writer_fallback)
-                if wf_qa_passed:
-                    post_data = writer_fallback
-                    wc = len(post_data["content"].split())
-                    print(f"[crew] Writer fallback QA passed: {wc} words, structure OK.", flush=True)
-                else:
-                    print(
-                        f"[crew] Writer fallback also failed QA: {wf_qa_reason}. Blog post discarded.",
-                        file=sys.stderr,
-                    )
-                    post_data = None
-            else:
-                print("[crew] No writer output to fall back to. Blog post discarded.", file=sys.stderr)
-                post_data = None
+            print(f"[crew] QA GATE FAILED: {qa_reason}. Blog post discarded.", file=sys.stderr)
+            post_data = None
         else:
             wc = len(post_data["content"].split())
             print(f"[crew] QA gate passed: {wc} words, structure OK.", flush=True)

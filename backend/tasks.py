@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from crewai import Task
 
-from agents import data_fetcher_agent, economist_agent, writer_agent, editor_agent
+from agents import economist_agent, writer_agent
 
 CATEGORIES = ["Trucking", "Retail", "SBA Loans", "Macro", "Staffing"]
 
@@ -100,10 +100,13 @@ def build_tasks(
     indicators_json: str,
     score_json: str,
     topic_override: str | None = None,
-) -> tuple[Task, Task, Task, Task]:
+) -> tuple[Task, Task]:
     """
-    Build the four CrewAI tasks for a pipeline run.
-    Returns (fetch_task, economist_task, writer_task, editor_task).
+    Build the two CrewAI tasks for a pipeline run.
+    Returns (economist_task, writer_task).
+
+    Two-task design keeps total token usage well within Groq free-tier limits:
+      economist (8b): ~1,300 tokens   writer (70b): ~3,000 tokens
 
     topic_override: when set (from content_calendar), the writer is directed to
                     write about this specific pre-planned topic instead of a generic category post.
@@ -111,27 +114,6 @@ def build_tasks(
     today = datetime.now(timezone.utc).date().isoformat()
     category = get_todays_category()
     seo = CATEGORY_SEO[category]
-
-    fetch_task = Task(
-        description=(
-            f"The economic indicators have already been fetched from FRED for {today}. "
-            f"Here is the raw data JSON:\n\n{indicators_json}\n\n"
-            "Validate ALL of the following before passing data downstream:\n"
-            "1. All six keys present: dprime, drtscilm, drtscis, t10y2y, icsa, busappwnsaus\n"
-            "2. All values are numbers (not null, not string, not zero unless genuinely zero)\n"
-            "3. Plausible ranges: dprime 3-15%, t10y2y -3 to +4, icsa 150000-800000, "
-            "busappwnsaus 30000-100000, drtscilm/drtscis between -30 and 80\n"
-            "If all checks pass: output the validated JSON unchanged. "
-            "If any check fails: output the JSON with a top-level 'validation_warnings' "
-            "array listing exactly which indicators failed and why."
-        ),
-        expected_output=(
-            "A validated JSON object with all six FRED indicator values. "
-            "If any value is suspicious, include a 'validation_warnings' array. "
-            "No transformation of the data — output it as received."
-        ),
-        agent=data_fetcher_agent,
-    )
 
     economist_task = Task(
         description=(
@@ -192,6 +174,7 @@ def build_tasks(
             f"PRIMARY KEYWORD: \"{seo['primary']}\"\n"
             f"SECONDARY KEYWORDS: {seo['secondary']}\n\n"
             f"INDUSTRY CONTEXT:\n{seo['industry_context']}\n\n"
+            f"ECONOMIC INDICATORS (cite exact values in the article):\n{indicators_json}\n\n"
             f"SCORE DATA (use as supporting evidence, not the main topic):\n{score_json}\n\n"
             "CONTENT STRUCTURE — follow this exactly:\n"
             f"1. TITLE: Evergreen, keyword-rich. No dates.\n"
@@ -306,75 +289,7 @@ def build_tasks(
             "meta_description."
         ),
         agent=writer_agent,
+        context=[economist_task],
     )
 
-    editor_task = Task(
-        description=(
-            "You are the final editorial gate before this article is published. "
-            "The writer has produced a draft blog post (JSON: title, slug, content, "
-            "meta_description). Apply every check below. Fix every failure. "
-            "Return the same JSON structure — polished and publication-ready.\n\n"
-            f"GROUND TRUTH DATA (fact-check all numbers against this):\n{score_json}\n\n"
-            f"INDUSTRY: {category} | PRIMARY KEYWORD: \"{seo['primary']}\"\n"
-            "TARGET READER: 40-year-old US small business owner, stressed about cash flow.\n\n"
-            "━━━ CHECKS (fix every failure) ━━━\n\n"
-            "1. OPENING HOOK: First two sentences must create urgency. Rewrite if it starts "
-            "with 'In today's...', 'As a small business owner', 'In the current landscape', "
-            "or any textbook opener. Good: 'Getting approved for a trucking loan just got "
-            "harder, and the prime rate is only part of the story.'\n\n"
-            "2. FACT-CHECK: Every number must match ground truth data. Every number needs "
-            "its unit AND a plain-English impact statement. Fix any wrong, bare, or unitless numbers.\n\n"
-            "3. AMERICAN ENGLISH: Fix every British spelling and idiom — "
-            "labour→labor, analyse→analyze, optimise→optimize, colour→color, "
-            "centre→center, whilst→while, realise→realize, 'high street'→'Main Street'.\n\n"
-            "4. SENTENCE QUALITY: Cut or rewrite vague filler: 'lenders are cautious', "
-            "'economic conditions present challenges', 'it's important to understand'. "
-            "Every sentence must be specific to today's data. Break paragraphs >3 sentences.\n\n"
-            f"5. SEO: Primary keyword '{seo['primary']}' must appear in first 50 words, "
-            "one H2, meta description, and the final section. "
-            "Meta description: one sentence, ends with period, primary keyword, max 140 chars. "
-            "Title: evergreen (no dates), primary keyword or natural variation, under 65 chars.\n\n"
-            "6. READABILITY: Active voice. Bold first mention of: prime rate, yield curve, "
-            "C&I lending standards, jobless claims, and the category's key product. "
-            "Max 2-3 sentences per paragraph. Rewrite press-release or textbook language.\n\n"
-            "7. FAQ: Each FAQ answer must be 3-4 sentences citing at least one real "
-            "indicator value. Not generic. Must reflect current conditions.\n\n"
-            "8. COMPLIANCE: Remove any sentence that recommends a specific lender, "
-            "product, or service, or directly advises the reader to borrow or invest.\n\n"
-            "9. WORD COUNT: Final content must be 1,200-1,600 words. "
-            "If short: expand FAQ answers and Practical Implications. "
-            "The article MUST END after the FAQ. No Conclusion, no Final Thoughts section. "
-            "Do NOT write the word count anywhere in the output.\n\n"
-            "10. ANTI-AI CLEANUP: Replace/remove these AI tells throughout the article:\n"
-            "  - Em dashes (—): replace with comma or colon. Zero em dashes allowed.\n"
-            "  - Banned verbs: delve→explore, leverage→use, facilitate→help, "
-            "foster→build, bolster→strengthen, navigate→handle, streamline→simplify, "
-            "underscore→highlight, enhance→improve, utilise→use.\n"
-            "  - Banned adjectives: robust→strong, comprehensive→complete, "
-            "pivotal→key, seamless→smooth, nuanced→specific, holistic→complete, "
-            "vital/crucial→important, transformative→significant.\n"
-            "  - Banned transitions: furthermore/moreover→also, 'that being said'→but, "
-            "'it is worth noting that'→(delete, state fact directly).\n"
-            "  - Banned openers: 'In today's...', 'In an era of...', 'Let's delve into...'\n"
-            "  - Banned closers: 'In conclusion...', 'To sum up...', 'At the end of the day...'\n"
-            "  - Filler words to delete: absolutely, essentially, incredibly, obviously, "
-            "simply, truly, ultimately, undoubtedly, very (if removable without losing meaning).\n\n"
-            "━━━ OUTPUT RULES ━━━\n"
-            "Output ONLY a valid JSON object. No preamble, no code fences, no commentary.\n"
-            "Exactly 4 keys in this order: title, slug, meta_description, content.\n"
-            "  title: evergreen, under 65 chars, contains primary keyword or natural variation\n"
-            "  slug: lowercase hyphens only, no dates, max 60 chars\n"
-            "  meta_description: one sentence, ends with period, max 140 chars, primary keyword\n"
-            "  content: 1,200-1,600 word markdown, ends at FAQ, no H1\n"
-        ),
-        expected_output=(
-            "A valid JSON object with exactly 4 keys: title (evergreen, under 65 chars), "
-            "slug (keyword-rich, no dates, max 60 chars), meta_description "
-            "(one sentence, period, primary keyword, max 140 chars), content "
-            "(1,200-1,600 word publication-ready evergreen markdown, ends after FAQ, no H1)."
-        ),
-        agent=editor_agent,
-        context=[writer_task],
-    )
-
-    return fetch_task, economist_task, writer_task, editor_task
+    return economist_task, writer_task

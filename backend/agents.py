@@ -1,6 +1,10 @@
 """
 CrewAI agent definitions.
 Uses CrewAI native LLM class with LiteLLM routing to Groq.
+
+Two-agent design to stay within Groq free-tier rate limits:
+  economist_agent → llama-3.1-8b-instant (20,000 TPM) — structured JSON bullets
+  writer_agent    → llama-3.3-70b-versatile (6,000 TPM)  — quality prose article
 """
 
 import os
@@ -9,10 +13,7 @@ from crewai import Agent, LLM
 
 
 def _fast_llm(max_tokens: int = 1500) -> LLM:
-    """
-    llama-3.1-8b-instant — 20,000 TPM free tier (vs 6,000 for 70b).
-    Used for data_fetcher and economist: structured JSON output, not prose.
-    """
+    """llama-3.1-8b-instant — 20,000 TPM free tier. Structured JSON output tasks."""
     return LLM(
         model="groq/llama-3.1-8b-instant",
         api_key=os.environ["GROQ_API_KEY"],
@@ -21,11 +22,8 @@ def _fast_llm(max_tokens: int = 1500) -> LLM:
     )
 
 
-def _quality_llm(max_tokens: int = 6000) -> LLM:
-    """
-    llama-3.3-70b-versatile — quality-critical prose tasks (writer, editor).
-    Kept at 6,000 TPM pool; writer+editor run sequentially so they don't overlap.
-    """
+def _quality_llm(max_tokens: int = 5000) -> LLM:
+    """llama-3.3-70b-versatile — 6,000 TPM free tier. Quality prose tasks."""
     return LLM(
         model="groq/llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
@@ -34,30 +32,12 @@ def _quality_llm(max_tokens: int = 6000) -> LLM:
     )
 
 
-data_fetcher_agent = Agent(
-    role="Federal Reserve Data Analyst",
-    goal=(
-        "Validate all six US economic indicator values from the FRED dataset. "
-        "Return clean structured JSON. Flag any value outside plausible range."
-    ),
-    backstory=(
-        "Quantitative analyst at the Federal Reserve Bank of Atlanta with 10 years "
-        "validating FRED time series. You know plausible ranges: DPRIME 3–15%, "
-        "T10Y2Y -3 to +4, ICSA 150k–800k, BUSAPPWNSAUS 30k–100k. "
-        "Output clean validated JSON. Write exclusively in American English."
-    ),
-    llm=_fast_llm(max_tokens=600),
-    max_iter=2,
-    verbose=False,
-    allow_delegation=False,
-)
-
 economist_agent = Agent(
     role="Senior US Macroeconomist",
     goal=(
         "Write exactly six causal reasoning bullets explaining WHY today's Business "
         "Funding Climate Score is what it is. Each bullet traces the transmission chain "
-        "from indicator value → real-world effect on a small business owner today."
+        "from indicator value to real-world effect on a small business owner today."
     ),
     backstory=(
         "PhD Economist, 15 years at the Federal Reserve Bank of Atlanta studying small "
@@ -91,46 +71,11 @@ writer_agent = Agent(
         "Your mental model of the reader: stressed, time-poor, deeply skeptical of generic advice. "
         "They will close the tab in 15 seconds if the opening does not hook them. "
         "They have read 50 articles starting with 'In today's economic climate...' and hated "
-        "every one. You have never written that phrase — it would end your career. "
+        "every one. You have never written that phrase. "
         "Every number you write includes its unit AND a plain-English impact statement. "
-        "You never write '5.3' alone when you can write '5.3 percentage points, which means "
-        "every variable-rate SBA loan just got more expensive to carry.' "
         "Your credibility comes from specificity and data, never from reassurance."
     ),
     llm=_quality_llm(max_tokens=5000),
-    max_iter=2,
-    verbose=False,
-    allow_delegation=False,
-)
-
-editor_agent = Agent(
-    role="Chief Editorial Director & SEO Strategist",
-    goal=(
-        "Elevate the drafted article to publication-ready quality by applying nine editorial "
-        "checks: opening hook strength, fact accuracy against ground truth data, American "
-        "English only, sentence specificity, SEO keyword placement, readability, FAQ depth, "
-        "compliance, and Anti-AI language cleanup. Fix every failure you find. "
-        "Return the identical JSON structure — improved content, same keys. "
-        "Your non-negotiable standard: every sentence must say something a reader could only "
-        "find here, about today's specific data — not recycled filler they've read elsewhere."
-    ),
-    backstory=(
-        "You are the Editorial Director of a major US financial media brand with 20 years "
-        "editing 3,000+ articles on SBA loans, invoice factoring, and small business credit "
-        "for Bloomberg Markets, Forbes Small Business, and Entrepreneur Magazine. "
-        "You have a near-perfect radar for AI-generated writing. The moment you see an em dash "
-        "used for dramatic effect, the words 'delve', 'leverage', 'robust', 'seamless', "
-        "'furthermore', 'it is worth noting that', or an opener like 'In today's landscape' — "
-        "you rewrite it with plain American English that sounds like a human wrote it on deadline. "
-        "You think in Google E-E-A-T signals because they directly determine search ranking "
-        "for YMYL (Your Money, Your Life) financial content. "
-        "Your editorial law: the first two sentences determine the article's entire readership. "
-        "A weak hook wastes every hour the writer spent on the rest of the piece. "
-        "You are surgical: change what is weak, preserve what is strong. "
-        "Never invent new facts or alter economic substance. "
-        "Write and edit exclusively in American English."
-    ),
-    llm=_fast_llm(max_tokens=5500),
     max_iter=2,
     verbose=False,
     allow_delegation=False,
