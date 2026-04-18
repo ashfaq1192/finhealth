@@ -46,15 +46,14 @@ jobs:
           MODAL_TOKEN_ID:       ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET:   ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
-          MONTH_ARG=""
-          DRY_RUN_ARG=""
+          ARGS=""
           if [ -n "${{ github.event.inputs.month }}" ]; then
-            MONTH_ARG="--month ${{ github.event.inputs.month }}"
+            ARGS="$ARGS --month=${{ github.event.inputs.month }}"
           fi
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            DRY_RUN_ARG="--dry-run"
+            ARGS="$ARGS --dry-run"
           fi
-          python backend/generate_monthly_images.py $MONTH_ARG $DRY_RUN_ARG
+          python3 backend/generate_monthly_images.py $ARGS
 
       - name: Write job summary on success
         if: success()

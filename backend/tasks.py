@@ -118,6 +118,7 @@ def build_tasks(
     economist_task = Task(
         description=(
             f"Using the scoring results for {today}:\n\n{score_json}\n\n"
+            f"INDICATOR VALUES — cite these EXACT numbers in your bullets (do NOT invent or estimate values):\n{indicators_json}\n\n"
             "Write exactly SIX reasoning bullets for the Business Funding Climate Score. "
             "Each bullet covers one of the six FRED indicators: prime rate (dprime), "
             "yield curve spread (t10y2y), C&I standards large firms (drtscilm), "
@@ -362,7 +363,9 @@ def build_editor_task(
             "  whilst→while, realise→realize, optimise→optimize, 'high street'→'Main Street'.\n\n"
             "━━━ CHECK 6 — STRUCTURE & SEO ━━━\n"
             "Confirm all of these are present. Fix anything missing:\n"
-            "  - Title: evergreen (no year, no 'today'), under 65 chars, contains primary keyword.\n"
+            "  - Title: PRESERVE the writer's title if it already contains the primary keyword "
+            "AND is under 65 chars. Only rewrite if: (a) it contains a year/date/'today', "
+            "(b) it exceeds 65 chars, OR (c) the primary keyword is completely absent.\n"
             "  - Meta description: exactly one sentence, ends with period, max 140 chars, "
             "    primary keyword present.\n"
             "  - Slug: lowercase, hyphens only, no dates, max 60 chars.\n"
