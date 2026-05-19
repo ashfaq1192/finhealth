@@ -61,7 +61,7 @@ interface Props {
 async function getPosts(category?: string) {
   let query = supabase
     .from("blog_posts")
-    .select("date, title, slug, meta_description, category")
+    .select("date, title, slug, meta_description, category, hero_image_url")
     .order("date", { ascending: false })
     .limit(50);
 
@@ -98,6 +98,49 @@ export default async function BlogIndexPage({ searchParams }: Props) {
             </Suspense>
           </div>
 
+          {/* Featured hero post — only on unfiltered view */}
+          {selected === "All" && posts[0] && (() => {
+            const hero = posts[0];
+            const heroBorder = CATEGORY_BORDER[hero.category] ?? "border-l-slate-300";
+            return (
+              <Link
+                href={`/blog/${hero.slug}`}
+                className="group block bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-slate-300 transition-all mb-4"
+              >
+                {hero.hero_image_url && (
+                  <div className="w-full overflow-hidden bg-slate-100" style={{ height: "240px" }}>
+                    <img
+                      src={hero.hero_image_url}
+                      alt={hero.title}
+                      className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-500"
+                      loading="eager"
+                    />
+                  </div>
+                )}
+                <div className={`p-6 border-l-4 ${heroBorder}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                      Latest
+                    </span>
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${CATEGORY_COLORS[hero.category] ?? "bg-slate-100 text-slate-600"}`}>
+                      {hero.category}
+                    </span>
+                    <span className="text-xs text-slate-400">{formatDate(hero.date)}</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug mb-2">
+                    {hero.title}
+                  </h2>
+                  <p className="text-sm text-slate-500 leading-relaxed mb-4 line-clamp-3">
+                    {hero.meta_description}
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 group-hover:gap-2.5 transition-all">
+                    Read full analysis →
+                  </span>
+                </div>
+              </Link>
+            );
+          })()}
+
           {/* Post list */}
           {posts.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">
@@ -105,7 +148,7 @@ export default async function BlogIndexPage({ searchParams }: Props) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {posts.map((post) => {
+              {(selected === "All" ? posts.slice(1) : posts).map((post) => {
                 const borderColor = CATEGORY_BORDER[post.category] ?? "border-l-slate-300";
                 return (
                   <Link
