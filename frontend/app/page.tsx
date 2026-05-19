@@ -124,54 +124,83 @@ const CATEGORY_BORDER: Record<string, string> = {
   Staffing:    "border-l-orange-400",
 };
 
-const INDICATORS = [
+const TOOLS = [
   {
-    label: "Prime Rate",
-    desc: "Sets the floor on most variable-rate business loans and SBA 7(a) rates",
-    impact: "Higher = costlier borrowing",
-    dot: "bg-red-400",
-    impactColor: "text-red-500",
-    dir: "↑",
+    href: "/tools/break-even-calculator",
+    name: "Break-Even Calculator",
+    tagline: "Find the exact revenue needed to cover your costs",
+    iconBg: "bg-violet-100",
+    iconColor: "text-violet-600",
+    hoverBorder: "hover:border-l-violet-400",
+    hoverText: "group-hover:text-violet-700",
+    icon: (
+      <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3v18M3 12h18M6 6l12 12M18 6 6 18" opacity=".25"/>
+        <path d="M3 18l4-4 4 4 4-8 4 4"/>
+      </svg>
+    ),
   },
   {
-    label: "Yield Curve",
-    desc: "10Y minus 2Y Treasury spread — inversion signals credit stress ahead",
-    impact: "Negative = recession signal",
-    dot: "bg-purple-400",
-    impactColor: "text-purple-500",
-    dir: "↓",
+    href: "/tools/cash-flow-runway",
+    name: "Cash Flow Runway",
+    tagline: "See how many months your cash reserves will last",
+    iconBg: "bg-sky-100",
+    iconColor: "text-sky-600",
+    hoverBorder: "hover:border-l-sky-400",
+    hoverText: "group-hover:text-sky-700",
+    icon: (
+      <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+        <path d="M12 6v6l4 2"/>
+      </svg>
+    ),
   },
   {
-    label: "C&I Standards (Large)",
-    desc: "% of banks tightening commercial loan standards for large firms",
-    impact: "Higher = less credit available",
-    dot: "bg-orange-400",
-    impactColor: "text-orange-500",
-    dir: "↑",
+    href: "/tools/invoice-factoring-calculator",
+    name: "Invoice Factoring Calculator",
+    tagline: "Calculate net payout and true factoring cost",
+    iconBg: "bg-emerald-100",
+    iconColor: "text-emerald-600",
+    hoverBorder: "hover:border-l-emerald-400",
+    hoverText: "group-hover:text-emerald-700",
+    icon: (
+      <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 2v6h6M9 13h6M9 17h4"/>
+      </svg>
+    ),
   },
   {
-    label: "C&I Standards (Small)",
-    desc: "% of banks tightening commercial loan standards for small firms",
-    impact: "Higher = harder to qualify",
-    dot: "bg-orange-300",
-    impactColor: "text-orange-400",
-    dir: "↑",
+    href: "/tools/loan-comparison",
+    name: "Loan Comparison Tool",
+    tagline: "Compare SBA, MCA, and line of credit side-by-side",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    hoverBorder: "hover:border-l-blue-400",
+    hoverText: "group-hover:text-blue-700",
+    icon: (
+      <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="18" y="3" width="3" height="18" rx="1"/>
+        <rect x="10.5" y="8" width="3" height="13" rx="1"/>
+        <rect x="3" y="13" width="3" height="8" rx="1"/>
+      </svg>
+    ),
   },
   {
-    label: "Jobless Claims",
-    desc: "Weekly new unemployment filings — reflects labor market health",
-    impact: "Higher = economic stress rising",
-    dot: "bg-amber-400",
-    impactColor: "text-amber-600",
-    dir: "↑",
-  },
-  {
-    label: "Business Applications",
-    desc: "New business filings — leading indicator of entrepreneur confidence",
-    impact: "Higher = opportunity signal",
-    dot: "bg-green-400",
-    impactColor: "text-green-600",
-    dir: "↑",
+    href: "/tools/mca-calculator",
+    name: "MCA True Cost Calculator",
+    tagline: "Reveal the real APR hiding in your factor rate",
+    iconBg: "bg-amber-100",
+    iconColor: "text-amber-600",
+    hoverBorder: "hover:border-l-amber-400",
+    hoverText: "group-hover:text-amber-700",
+    icon: (
+      <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="2.5"/>
+        <circle cx="15" cy="15" r="2.5"/>
+        <path d="M16.5 7.5 7.5 16.5"/>
+      </svg>
+    ),
   },
 ];
 
@@ -251,30 +280,55 @@ export default async function HomePage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 h-full">
-            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1">
-              What Is This?
-            </p>
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
-              A daily composite score (0–100) measuring how favorable US economic
-              conditions are for small business funding — powered by 6 Federal Reserve
-              indicators, updated every morning.
-            </p>
-            <div className="space-y-2">
-              {INDICATORS.map(({ label, desc, impact, dot, impactColor, dir }) => (
-                <div key={label} className="flex gap-3 items-start bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
-                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${dot}`} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-700 leading-snug">{label}</p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{desc}</p>
-                    <p className={`text-[10px] font-semibold mt-0.5 ${impactColor}`}>
-                      {dir} {impact}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 h-full flex flex-col">
+            {/* Header */}
+            <div className="mb-4">
+              <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1">
+                Free Calculators
+              </p>
+              <p className="text-sm font-semibold text-slate-700 leading-snug">
+                Put today&apos;s conditions to work
+              </p>
+            </div>
+
+            {/* Tool cards */}
+            <div className="flex flex-col gap-1.5 flex-1">
+              {TOOLS.map(({ href, name, tagline, iconBg, iconColor, hoverBorder, hoverText, icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`group flex items-center gap-3 rounded-xl border border-slate-100 border-l-4 border-l-slate-100 ${hoverBorder} bg-slate-50 hover:bg-white hover:shadow-sm px-3 py-2.5 transition-all`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg} ${iconColor}`}>
+                    {icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-bold text-slate-800 leading-snug transition-colors ${hoverText}`}>
+                      {name}
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5 line-clamp-1">
+                      {tagline}
                     </p>
                   </div>
-                </div>
+                  <span className="text-slate-300 group-hover:text-slate-500 transition-colors text-sm flex-shrink-0">
+                    →
+                  </span>
+                </Link>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 mt-3 text-center">Updated daily · 9 AM ET</p>
+
+            {/* Credibility footer */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Score powered by 6 Fed indicators
+              </p>
+              <Link
+                href="/methodology"
+                className="text-[11px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+              >
+                Methodology →
+              </Link>
+            </div>
           </div>
         </div>
       </div>
