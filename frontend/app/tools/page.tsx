@@ -81,18 +81,29 @@ const TOOLS = [
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "CollectionPage",
-  name: "Free Small Business Finance Tools",
-  description:
-    "Free financial calculators for US small business owners — invoice factoring, MCA cost, break-even, cash flow runway, and SBA loan payments.",
-  url: "https://usfundingclimate.com/tools",
-  hasPart: TOOLS.map((t) => ({
-    "@type": "SoftwareApplication",
-    name: t.title,
-    url: `https://usfundingclimate.com${t.href}`,
-    applicationCategory: "FinanceApplication",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-  })),
+  "@graph": [
+    {
+      "@type": "CollectionPage",
+      name: "Free Small Business Finance Tools",
+      description:
+        "Free financial calculators for US small business owners — invoice factoring, MCA cost, break-even, cash flow runway, and SBA loan payments.",
+      url: "https://usfundingclimate.com/tools",
+      hasPart: TOOLS.map((t) => ({
+        "@type": "SoftwareApplication",
+        name: t.title,
+        url: `https://usfundingclimate.com${t.href}`,
+        applicationCategory: "FinanceApplication",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      })),
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+        { "@type": "ListItem", position: 2, name: "Tools", item: "https://usfundingclimate.com/tools" },
+      ],
+    },
+  ],
 };
 
 export default function ToolsPage() {

@@ -196,13 +196,31 @@ export default function LoanComparisonPage() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "Business Loan Comparison Calculator",
-    description:
-      "Compare SBA 7(a) loans, merchant cash advances, invoice factoring, and lines of credit side-by-side with true APR and total cost calculations.",
-    url: "https://usfundingclimate.com/tools/loan-comparison",
-    applicationCategory: "FinanceApplication",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "Business Loan Comparison Calculator",
+        description:
+          "Compare SBA 7(a) loans, merchant cash advances, invoice factoring, and lines of credit side-by-side with true APR and total cost calculations.",
+        url: "https://usfundingclimate.com/tools/loan-comparison",
+        applicationCategory: "FinanceApplication",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Tools", item: "https://usfundingclimate.com/tools" },
+          { "@type": "ListItem", position: 3, name: "Business Loan Comparison", item: "https://usfundingclimate.com/tools/loan-comparison" },
+        ],
+      },
+    ],
   };
 
   return (

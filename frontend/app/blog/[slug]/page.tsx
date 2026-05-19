@@ -10,6 +10,8 @@ import EditButton from "@/components/EditButton";
 import ShareButtons from "@/components/ShareButtons";
 import EmailCapture from "@/components/EmailCapture";
 import BackToTop from "@/components/BackToTop";
+import TableOfContents, { type TocHeading } from "@/components/TableOfContents";
+import ReadingProgressBar from "@/components/ReadingProgressBar";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -47,6 +49,27 @@ async function getScore(scoreId: string) {
     .eq("id", scoreId)
     .single();
   return data;
+}
+
+async function getPrevNextPosts(date: string) {
+  const [{ data: prevRows }, { data: nextRows }] = await Promise.all([
+    supabase
+      .from("blog_posts")
+      .select("slug, title, category")
+      .lt("date", date)
+      .order("date", { ascending: false })
+      .limit(1),
+    supabase
+      .from("blog_posts")
+      .select("slug, title, category")
+      .gt("date", date)
+      .order("date", { ascending: true })
+      .limit(1),
+  ]);
+  return {
+    prev: prevRows?.[0] ?? null,
+    next: nextRows?.[0] ?? null,
+  };
 }
 
 async function getRelatedPosts(category: string, excludeSlug: string) {
@@ -96,6 +119,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function processHeadings(html: string): { html: string; headings: TocHeading[] } {
+  const headings: TocHeading[] = [];
+  const seen = new Map<string, number>();
+  const processed = html.replace(/<h([23])([^>]*)>([\s\S]*?)<\/h\1>/gi, (_, lvl, attrs, inner) => {
+    const text = inner.replace(/<[^>]+>/g, "").trim();
+    const baseId = slugify(text);
+    const count = seen.get(baseId) ?? 0;
+    const id = count === 0 ? baseId : `${baseId}-${count}`;
+    seen.set(baseId, count + 1);
+    headings.push({ id, text, level: parseInt(lvl) as 2 | 3 });
+    return `<h${lvl} id="${id}"${attrs}>${inner}</h${lvl}>`;
+  });
+  return { html: processed, headings };
+}
+
 function sanitizeHtml(markdown: string, stripFirstImage = false): string {
   const html = marked.parse(markdown) as string;
   let clean = sanitizeHtmlLib(html, {
@@ -105,6 +150,8 @@ function sanitizeHtml(markdown: string, stripFirstImage = false): string {
       // Override after spread so our entries take precedence
       a: ["href", "target", "rel"],
       img: ["src", "alt", "width", "height", "loading"],
+      h2: ["id"],
+      h3: ["id"],
     },
     allowedSchemesByTag: { img: ["https"] },
   });
@@ -149,43 +196,60 @@ export default async function BlogPostPage({ params }: Props) {
   const post = await getPost(slug);
   if (!post) notFound();
 
-  const [score, relatedPosts] = await Promise.all([
+  const [score, relatedPosts, { prev, next }] = await Promise.all([
     post.score_id ? getScore(post.score_id) : Promise.resolve(null),
     getRelatedPosts(post.category, slug),
+    getPrevNextPosts(post.date),
   ]);
 
   // Prefer uploaded hero image; fall back to first markdown image (proxied to avoid CORS/hotlink issues)
   const heroSrc = post.hero_image_url || proxyImage(extractFirstImage(post.content));
-  const canonicalUrl = `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim()}/blog/${post.slug}`;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim();
+  const canonicalUrl = `${siteUrl}/blog/${post.slug}`;
+  const authorLinkedIn = "https://www.linkedin.com/in/m-ashfaq-economist";
 
   // Strip the first markdown image from content only when a hero is being shown
-  const safeHtml = sanitizeHtml(post.content, !!heroSrc);
+  const rawHtml = sanitizeHtml(post.content, !!heroSrc);
+  const { html: safeHtml, headings } = processHeadings(rawHtml);
   const categoryColor = CATEGORY_COLORS[post.category] ?? "bg-slate-100 text-slate-700 border-slate-200";
   const scoreColor = score ? (SCORE_COLORS[score.status_label] ?? "text-slate-700 bg-slate-50 border-slate-200") : "";
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "BlogPosting",
-    headline: post.title,
-    description: post.meta_description,
-    datePublished: post.date,
-    dateModified: post.date,
-    url: canonicalUrl,
-    mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
-    author: {
-      "@type": "Person",
-      name: "Ashfaq Ahmad",
-      url: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim()}/about`,
-      jobTitle: "M.Phil Economics",
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "US Business Funding Climate Score",
-      url: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://usfundingclimate.com").trim(),
-    },
-    articleSection: post.category,
-    keywords: `small business funding, ${post.category.toLowerCase()}, business loans, SBA loans, prime rate`,
-    ...(heroSrc ? { image: heroSrc } : {}),
+    "@graph": [
+      {
+        "@type": "BlogPosting",
+        headline: post.title,
+        description: post.meta_description,
+        datePublished: post.date,
+        dateModified: post.date,
+        url: canonicalUrl,
+        mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: `${siteUrl}/about`,
+          jobTitle: "M.Phil Economics",
+          sameAs: [authorLinkedIn],
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "US Business Funding Climate Score",
+          url: siteUrl,
+        },
+        articleSection: post.category,
+        keywords: `small business funding, ${post.category.toLowerCase()}, business loans, SBA loans, prime rate`,
+        ...(heroSrc ? { image: heroSrc } : {}),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: siteUrl },
+          { "@type": "ListItem", position: 2, name: "Analysis", item: `${siteUrl}/blog` },
+          { "@type": "ListItem", position: 3, name: post.category, item: `${siteUrl}/blog?category=${encodeURIComponent(post.category)}` },
+        ],
+      },
+    ],
   };
 
   return (
@@ -194,6 +258,7 @@ export default async function BlogPostPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <ReadingProgressBar />
       <BackToTop />
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -316,10 +381,56 @@ export default async function BlogPostPage({ params }: Props) {
               </ul>
             </div>
           )}
+
+          {/* Prev / Next navigation */}
+          {(prev || next) && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {prev ? (
+                <Link
+                  href={`/blog/${prev.slug}`}
+                  className="group flex flex-col gap-1.5 bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-400 hover:shadow-sm transition-all"
+                >
+                  <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase flex items-center gap-1">
+                    ← Older
+                  </span>
+                  <span className={`self-start text-[10px] font-bold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[prev.category] ?? "bg-slate-100 text-slate-600"}`}>
+                    {prev.category}
+                  </span>
+                  <p className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
+                    {prev.title}
+                  </p>
+                </Link>
+              ) : (
+                <div />
+              )}
+
+              {next ? (
+                <Link
+                  href={`/blog/${next.slug}`}
+                  className="group flex flex-col gap-1.5 bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-400 hover:shadow-sm transition-all text-right"
+                >
+                  <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase flex items-center justify-end gap-1">
+                    Newer →
+                  </span>
+                  <span className={`self-end text-[10px] font-bold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[next.category] ?? "bg-slate-100 text-slate-600"}`}>
+                    {next.category}
+                  </span>
+                  <p className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
+                    {next.title}
+                  </p>
+                </Link>
+              ) : (
+                <div />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-3">
+          {/* Table of contents */}
+          <TableOfContents headings={headings} />
+
           {/* Score context widget */}
           {score && (
             <div className={`rounded-2xl border p-4 ${scoreColor}`}>

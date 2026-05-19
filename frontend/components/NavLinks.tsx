@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/",            label: "Score",       exact: true },
-  { href: "/blog",        label: "Analysis",    exact: false },
-  { href: "/tools",       label: "Tools",       exact: false },
-  { href: "/methodology", label: "Methodology", exact: false },
-  { href: "/about",       label: "About",       exact: false },
-  { href: "/contact",     label: "Contact",     exact: false },
+  { href: "/",               label: "Score",     exact: true  },
+  { href: "/blog",           label: "Analysis",  exact: false },
+  { href: "/tools",          label: "Tools",     exact: false },
+  { href: "/score-history",  label: "History",   exact: false },
+  { href: "/methodology",    label: "Methodology", exact: false },
+  { href: "/about",          label: "About",     exact: false },
+  { href: "/contact",        label: "Contact",   exact: false },
 ];
 
 export default function NavLinks() {

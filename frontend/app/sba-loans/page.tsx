@@ -28,31 +28,81 @@ async function getLiveScore() {
   return data;
 }
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Article",
-  headline: "SBA Loans: Eligibility, Rates & How to Apply",
-  description:
-    "Complete guide to SBA loan eligibility, current rates, and application process for US small business owners.",
-  url: "https://usfundingclimate.com/sba-loans",
-  author: {
-    "@type": "Person",
-    name: "M. Ashfaq",
-    url: "https://usfundingclimate.com/about",
-    jobTitle: "M.Phil Economics",
-  },
-  publisher: {
-    "@type": "Organization",
-    name: "US Business Funding Climate Score",
-    url: "https://usfundingclimate.com",
-  },
-};
-
 export default async function SbaLoansPage() {
   const score = await getLiveScore();
   const primeRate = score?.dprime ?? 7.5;
   const sba7aRate = primeRate + 2.75;
   const sba7aRateLarge = primeRate + 2.25;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: "SBA Loans: Eligibility, Rates & How to Apply",
+        description:
+          "Complete guide to SBA loan eligibility, current rates, and application process for US small business owners.",
+        url: "https://usfundingclimate.com/sba-loans",
+        dateModified: new Date().toISOString().split("T")[0],
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          jobTitle: "M.Phil Economics",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "US Business Funding Climate Score",
+          url: "https://usfundingclimate.com",
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "SBA Loans", item: "https://usfundingclimate.com/sba-loans" },
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "What credit score do I need for an SBA loan?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: `Most SBA lenders currently require a personal FICO score of 650–700 minimum. With the prime rate at ${primeRate.toFixed(2)}% and C&I lending standards tighter than pre-2022, many lenders have quietly raised their informal floor to 700+. A score above 720 puts you in a meaningfully stronger position.`,
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Are SBA loan rates going up or down right now?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: `SBA 7(a) rates move directly with the prime rate, which currently sits at ${primeRate.toFixed(2)}%. That puts standard SBA 7(a) rates at ${sba7aRate.toFixed(2)}% — significantly above the pre-2022 baseline of around 5.5–6.0%. Whether rates go up or down depends entirely on the Federal Reserve's next moves.`,
+            },
+          },
+          {
+            "@type": "Question",
+            name: "How long does SBA loan approval take?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Standard SBA 7(a) approval takes 30–90 days. In the current tighter credit environment, underwriting is more thorough, which tends to add 2–4 weeks to the process. If you use a Preferred Lender Program (PLP) bank, they can approve without SBA review and cut total time to 2–4 weeks. Apply at least 60–90 days before you need the funds.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What is the difference between SBA 7(a) and a merchant cash advance?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: `An SBA 7(a) loan at ${sba7aRate.toFixed(2)}% is the annual rate on the outstanding balance. A merchant cash advance typically has an effective APR of 40–150% when you run the numbers. The SBA loan is dramatically cheaper but requires 30–90 days to fund and strong credit (680+ FICO).`,
+            },
+          },
+        ],
+      },
+    ],
+  };
 
   return (
     <>

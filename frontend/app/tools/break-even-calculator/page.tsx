@@ -37,14 +37,32 @@ export default function BreakEvenCalculator() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "Break-Even Calculator for Small Business",
-    applicationCategory: "FinanceApplication",
-    operatingSystem: "Web",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    description:
-      "Free break-even calculator for small businesses. Calculate your break-even point in units and revenue, contribution margin, and margin of safety.",
-    url: "https://usfundingclimate.com/tools/break-even-calculator",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "Break-Even Calculator for Small Business",
+        applicationCategory: "FinanceApplication",
+        operatingSystem: "Web",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        description:
+          "Free break-even calculator for small businesses. Calculate your break-even point in units and revenue, contribution margin, and margin of safety.",
+        url: "https://usfundingclimate.com/tools/break-even-calculator",
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Tools", item: "https://usfundingclimate.com/tools" },
+          { "@type": "ListItem", position: 3, name: "Break-Even Calculator", item: "https://usfundingclimate.com/tools/break-even-calculator" },
+        ],
+      },
+    ],
   };
 
   return (

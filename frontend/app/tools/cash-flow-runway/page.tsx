@@ -64,14 +64,32 @@ export default function CashFlowRunwayCalculator() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "Cash Flow Runway Calculator",
-    applicationCategory: "FinanceApplication",
-    operatingSystem: "Web",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    description:
-      "Free cash flow runway calculator for small businesses. See how many months of cash you have left and your projected cash-out date.",
-    url: "https://usfundingclimate.com/tools/cash-flow-runway",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "Cash Flow Runway Calculator",
+        applicationCategory: "FinanceApplication",
+        operatingSystem: "Web",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        description:
+          "Free cash flow runway calculator for small businesses. See how many months of cash you have left and your projected cash-out date.",
+        url: "https://usfundingclimate.com/tools/cash-flow-runway",
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Tools", item: "https://usfundingclimate.com/tools" },
+          { "@type": "ListItem", position: 3, name: "Cash Flow Runway Calculator", item: "https://usfundingclimate.com/tools/cash-flow-runway" },
+        ],
+      },
+    ],
   };
 
   return (

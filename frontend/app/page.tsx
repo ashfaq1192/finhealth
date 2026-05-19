@@ -36,6 +36,9 @@ export const metadata: Metadata = {
       "Free daily score (0–100) measuring how favorable US conditions are for small business loans — powered by 6 Federal Reserve indicators.",
   },
 };
+// Update this when LinkedIn profile is ready
+const AUTHOR_LINKEDIN_URL = "https://www.linkedin.com/in/ashfaq-ahmed-79264696/";
+
 import ScoreCard, { ScoreState } from "@/components/ScoreCard";
 import Link from "next/link";
 import TodaysFocus from "@/components/TodaysFocus";
@@ -204,11 +207,12 @@ export default async function HomePage() {
         "@id": "https://usfundingclimate.com/#organization",
         "name": "US Business Funding Climate Score",
         "url": "https://usfundingclimate.com",
-        "sameAs": [],
+        "sameAs": [AUTHOR_LINKEDIN_URL],
         "founder": {
           "@type": "Person",
           "name": "M. Ashfaq",
           "jobTitle": "M.Phil Economics",
+          "sameAs": [AUTHOR_LINKEDIN_URL],
         },
       },
       {
@@ -314,12 +318,20 @@ export default async function HomePage() {
             <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">
               Latest Analysis
             </p>
-            <Link
-              href="/blog"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              View all →
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/score-history"
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                Score history →
+              </Link>
+              <Link
+                href="/blog"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                View all →
+              </Link>
+            </div>
           </div>
           <div className="flex flex-col gap-3">
             {latestPosts.map((post) => {

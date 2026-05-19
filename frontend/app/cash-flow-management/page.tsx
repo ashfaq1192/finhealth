@@ -126,25 +126,37 @@ export default async function CashFlowManagementPage() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: "Small Business Cash Flow Management: The Survival Guide",
-    description:
-      "How to manage cash flow as a small business owner — burn rate, seasonal gaps, net-30 strain, payroll funding, and when to seek financing.",
-    url: "https://usfundingclimate.com/cash-flow-management",
-    datePublished: "2026-04-01",
-    dateModified: new Date().toISOString().split("T")[0],
-    author: {
-      "@type": "Person",
-      name: "Ashfaq Ahmad",
-      url: "https://usfundingclimate.com/about",
-      jobTitle: "M.Phil Economics",
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "US Business Funding Climate Score",
-      url: "https://usfundingclimate.com",
-    },
-    mainEntityOfPage: { "@type": "WebPage", "@id": "https://usfundingclimate.com/cash-flow-management" },
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: "Small Business Cash Flow Management: The Survival Guide",
+        description:
+          "How to manage cash flow as a small business owner — burn rate, seasonal gaps, net-30 strain, payroll funding, and when to seek financing.",
+        url: "https://usfundingclimate.com/cash-flow-management",
+        datePublished: "2026-04-01",
+        dateModified: new Date().toISOString().split("T")[0],
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          jobTitle: "M.Phil Economics",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "US Business Funding Climate Score",
+          url: "https://usfundingclimate.com",
+        },
+        mainEntityOfPage: { "@type": "WebPage", "@id": "https://usfundingclimate.com/cash-flow-management" },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Cash Flow Management", item: "https://usfundingclimate.com/cash-flow-management" },
+        ],
+      },
+    ],
   };
 
   return (

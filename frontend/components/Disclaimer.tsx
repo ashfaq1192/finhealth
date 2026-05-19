@@ -14,6 +14,7 @@ export default function Disclaimer() {
         </p>
         <nav className="flex flex-wrap items-center gap-4 flex-shrink-0">
           <Link href="/about" className="hover:text-slate-200 transition-colors">About</Link>
+          <Link href="/score-history" className="hover:text-slate-200 transition-colors">Score History</Link>
           <Link href="/methodology" className="hover:text-slate-200 transition-colors">Methodology</Link>
           <Link href="/disclaimer" className="hover:text-slate-200 transition-colors">Disclaimer</Link>
           <Link href="/legal" className="hover:text-slate-200 transition-colors">Legal</Link>

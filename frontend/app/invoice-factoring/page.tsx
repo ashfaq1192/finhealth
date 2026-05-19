@@ -28,29 +28,79 @@ async function getLiveScore() {
   return data;
 }
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Article",
-  headline: "Invoice Factoring: How It Works, Rates & Alternatives",
-  description:
-    "Complete guide to invoice factoring for US small businesses — rates, how it works, trucking and staffing use cases, and comparison vs MCA.",
-  url: "https://usfundingclimate.com/invoice-factoring",
-  author: {
-    "@type": "Person",
-    name: "M. Ashfaq",
-    url: "https://usfundingclimate.com/about",
-    jobTitle: "M.Phil Economics",
-  },
-  publisher: {
-    "@type": "Organization",
-    name: "US Business Funding Climate Score",
-    url: "https://usfundingclimate.com",
-  },
-};
-
 export default async function InvoiceFactoringPage() {
   const score = await getLiveScore();
   const primeRate = score?.dprime ?? 7.5;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: "Invoice Factoring: How It Works, Rates & Alternatives",
+        description:
+          "Complete guide to invoice factoring for US small businesses — rates, how it works, trucking and staffing use cases, and comparison vs MCA.",
+        url: "https://usfundingclimate.com/invoice-factoring",
+        dateModified: new Date().toISOString().split("T")[0],
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          jobTitle: "M.Phil Economics",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "US Business Funding Climate Score",
+          url: "https://usfundingclimate.com",
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Invoice Factoring", item: "https://usfundingclimate.com/invoice-factoring" },
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Is invoice factoring a good option for trucking companies right now?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: `With the prime rate at ${primeRate.toFixed(2)}% and C&I lending standards tighter than pre-2022, bank lines of credit for owner-operators are harder to get and more expensive. Factoring is not cheap — a 2% fee on a 30-day invoice equals a 24% effective APR — but it requires no collateral, no minimum credit score, and funds in 24 hours.`,
+            },
+          },
+          {
+            "@type": "Question",
+            name: "How does the prime rate affect invoice factoring costs?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: `Invoice factoring fees are not directly tied to the prime rate, but factoring companies borrow money to fund advances. At the current prime rate of ${primeRate.toFixed(2)}%, their cost of capital is elevated — and they pass that on through tighter standards or slightly higher fees for riskier clients. Factoring rates in this environment run roughly 0.25–0.5 percentage points higher than at prime 4.5%.`,
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What are typical invoice factoring rates for staffing companies?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Staffing factoring rates typically run 1–3% per invoice, with advance rates of 85–92%. On a $100,000 invoice with a 1.5% fee, you receive $85,000–$92,000 upfront and the remainder when the client pays minus the $1,500 fee. The effective APR depends on payment speed — on Net-30 invoices, a 1.5% fee equals an 18% effective APR.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What is the difference between invoice factoring and a merchant cash advance?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Invoice factoring advances cash against specific invoices your clients owe you — approval is based on your customer's creditworthiness, not yours. A merchant cash advance is based on your daily card or bank sales and is repaid as a percentage of daily revenue. Factoring effective APRs typically run 18–65%; MCA effective APRs run 40–150%+. Factoring is almost always cheaper for B2B businesses with invoices.",
+            },
+          },
+        ],
+      },
+    ],
+  };
 
   return (
     <>

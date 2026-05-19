@@ -48,19 +48,32 @@ export default function InvoiceFactoringCalculator() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "Invoice Factoring Cost Calculator",
-    applicationCategory: "FinanceApplication",
-    operatingSystem: "Web",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    description:
-      "Free invoice factoring calculator for small businesses. Calculate net cash received, effective APR, and total cost of factoring your invoices.",
-    url: "https://usfundingclimate.com/tools/invoice-factoring-calculator",
-    author: {
-      "@type": "Person",
-      name: "M. Ashfaq",
-      url: "https://usfundingclimate.com/about",
-    },
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "Invoice Factoring Cost Calculator",
+        applicationCategory: "FinanceApplication",
+        operatingSystem: "Web",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        description:
+          "Free invoice factoring calculator for small businesses. Calculate net cash received, effective APR, and total cost of factoring your invoices.",
+        url: "https://usfundingclimate.com/tools/invoice-factoring-calculator",
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Tools", item: "https://usfundingclimate.com/tools" },
+          { "@type": "ListItem", position: 3, name: "Invoice Factoring Calculator", item: "https://usfundingclimate.com/tools/invoice-factoring-calculator" },
+        ],
+      },
+    ],
   };
 
   return (

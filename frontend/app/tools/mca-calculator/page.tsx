@@ -39,14 +39,32 @@ export default function McaCalculator() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "MCA True Cost Calculator",
-    applicationCategory: "FinanceApplication",
-    operatingSystem: "Web",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    description:
-      "Free merchant cash advance calculator. Convert your MCA factor rate to effective APR and see the true cost before you sign.",
-    url: "https://usfundingclimate.com/tools/mca-calculator",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "MCA True Cost Calculator",
+        applicationCategory: "FinanceApplication",
+        operatingSystem: "Web",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        description:
+          "Free merchant cash advance calculator. Convert your MCA factor rate to effective APR and see the true cost before you sign.",
+        url: "https://usfundingclimate.com/tools/mca-calculator",
+        author: {
+          "@type": "Person",
+          name: "M. Ashfaq",
+          url: "https://usfundingclimate.com/about",
+          sameAs: ["https://www.linkedin.com/in/m-ashfaq-economist"],
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://usfundingclimate.com" },
+          { "@type": "ListItem", position: 2, name: "Tools", item: "https://usfundingclimate.com/tools" },
+          { "@type": "ListItem", position: 3, name: "MCA True Cost Calculator", item: "https://usfundingclimate.com/tools/mca-calculator" },
+        ],
+      },
+    ],
   };
 
   return (
