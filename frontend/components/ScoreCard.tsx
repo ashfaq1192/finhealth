@@ -4,12 +4,19 @@ import { useEffect, useRef, useState } from "react";
 
 export type ScoreState = "current" | "stale" | "unavailable" | "cold-start";
 
+export interface TrendPoint {
+  date: string;
+  health_score: number;
+  status_label: string;
+}
+
 interface ScoreCardProps {
   score: number | null;
   label: string | null;
   date: string | null;
   reasoning: string[];
   state: ScoreState;
+  recentScores?: TrendPoint[];
 }
 
 const THEME: Record<string, { bar: string; badge: string; score: string; bg: string; border: string }> = {
@@ -148,7 +155,7 @@ function useSlotMachineScore(target: number | null) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export default function ScoreCard({ score, label, date, reasoning, state }: ScoreCardProps) {
+export default function ScoreCard({ score, label, date, reasoning, state, recentScores }: ScoreCardProps) {
   const { display: displayScore, animating } = useSlotMachineScore(score);
 
   if (state === "cold-start") {
@@ -241,6 +248,76 @@ export default function ScoreCard({ score, label, date, reasoning, state }: Scor
           </div>
         </div>
       </div>
+
+      {/* 7-day sparkline */}
+      {recentScores && recentScores.length >= 2 && !animating && (() => {
+        const first = recentScores[0].health_score;
+        const last  = recentScores[recentScores.length - 1].health_score;
+        const delta = last - first;
+        const deltaLabel =
+          delta > 0 ? `↑ ${delta} pts this week`
+          : delta < 0 ? `↓ ${Math.abs(delta)} pts this week`
+          : "→ unchanged this week";
+        const deltaColor =
+          delta > 0 ? "text-green-600"
+          : delta < 0 ? "text-red-500"
+          : "text-slate-400";
+
+        return (
+          <div className="px-8 pb-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                7-Day Trend
+              </p>
+              <span className={`text-[10px] font-bold ${deltaColor}`}>
+                {deltaLabel}
+              </span>
+            </div>
+            <div className="flex items-end gap-1 h-10">
+              {recentScores.map((s, i) => {
+                const isLatest = i === recentScores.length - 1;
+                const barColor =
+                  s.health_score >= 80 ? "bg-green-400"
+                  : s.health_score >= 60 ? "bg-sky-400"
+                  : s.health_score >= 40 ? "bg-amber-400"
+                  : "bg-red-400";
+                const heightPct = Math.max(8, (s.health_score / 100) * 100);
+                return (
+                  <div
+                    key={s.date}
+                    className="flex-1 relative group"
+                    style={{ height: "100%" }}
+                    title={`${s.date}: ${s.health_score} (${s.status_label})`}
+                  >
+                    <div
+                      className={`absolute bottom-0 w-full rounded-t ${barColor} transition-opacity ${
+                        isLatest ? "opacity-100 ring-1 ring-slate-900/10" : "opacity-40"
+                      }`}
+                      style={{ height: `${heightPct}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex mt-1.5">
+              {recentScores.map((s, i) => {
+                const isLatest = i === recentScores.length - 1;
+                const [, m, d] = s.date.split("-");
+                return (
+                  <span
+                    key={s.date}
+                    className={`flex-1 text-center text-[9px] ${
+                      isLatest ? "text-slate-600 font-bold" : "text-slate-300"
+                    }`}
+                  >
+                    {parseInt(m)}/{parseInt(d)}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Reasoning bullets */}
       {reasoning.length > 0 && !animating && (

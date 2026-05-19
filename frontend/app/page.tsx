@@ -86,6 +86,15 @@ async function getLatestPosts(): Promise<PostRow[]> {
   return data ?? [];
 }
 
+async function getRecentScores() {
+  const { data } = await supabase
+    .from("daily_scores")
+    .select("date, health_score, status_label")
+    .order("date", { ascending: false })
+    .limit(7);
+  return (data ?? []).reverse();
+}
+
 function computeScoreState(latest: ScoreRow | null): ScoreState {
   if (!latest) return "cold-start";
   const latestDate = new Date(latest.date);
@@ -205,9 +214,10 @@ const TOOLS = [
 ];
 
 export default async function HomePage() {
-  const [latest, latestPosts] = await Promise.all([
+  const [latest, latestPosts, recentScores] = await Promise.all([
     getLatestScore(),
     getLatestPosts(),
+    getRecentScores(),
   ]);
 
   const state = computeScoreState(latest);
@@ -276,6 +286,7 @@ export default async function HomePage() {
             date={latest?.date ?? null}
             reasoning={latest?.reasoning ?? []}
             state={state}
+            recentScores={recentScores}
           />
         </div>
 
@@ -341,29 +352,29 @@ export default async function HomePage() {
         />
       </div>
 
-      {/* ── 3. TODAY'S FOCUS + FOMC COUNTDOWN ── */}
+      {/* ── 3. EMAIL CAPTURE — peak engagement moment after score + loan context ── */}
+      <div className="mb-5">
+        <EmailCapture />
+      </div>
+
+      {/* ── 4. TODAY'S FOCUS + FOMC COUNTDOWN ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
         {latestPosts[0] && <TodaysFocus post={latestPosts[0]} />}
         <FOMCCountdown />
       </div>
 
-      {/* ── 4. CPI + NFIB CONTEXT STRIP ── animated client component */}
+      {/* ── 5. CPI + NFIB CONTEXT STRIP ── animated client component */}
       <ContextStatsPanel
         cpi_yoy={latest?.cpi_yoy}
         nfib_optimism={latest?.nfib_optimism}
       />
 
-      {/* ── 5. PRIME RATE CALCULATOR ── */}
+      {/* ── 6. PRIME RATE CALCULATOR ── */}
       {latest?.dprime != null && (
         <div className="mb-5">
           <PrimeRateCalculator primeRate={latest.dprime} />
         </div>
       )}
-
-      {/* ── 6. EMAIL CAPTURE ── */}
-      <div className="mb-6">
-        <EmailCapture />
-      </div>
 
       {/* ── 7. LATEST ANALYSIS ── */}
       {latestPosts.length > 0 && (
