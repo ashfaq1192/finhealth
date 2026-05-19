@@ -25,6 +25,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   Staffing:    "bg-orange-100 text-orange-700 border-orange-200",
 };
 
+const CATEGORY_BORDER: Record<string, string> = {
+  Trucking:    "border-l-blue-400",
+  Retail:      "border-l-purple-400",
+  "SBA Loans": "border-l-green-400",
+  Macro:       "border-l-slate-400",
+  Staffing:    "border-l-orange-400",
+};
+
 const SCORE_COLORS: Record<string, string> = {
   Optimal:  "text-green-600 bg-green-50 border-green-200",
   Moderate: "text-sky-700 bg-sky-50 border-sky-200",
@@ -212,6 +220,7 @@ export default async function BlogPostPage({ params }: Props) {
   const rawHtml = sanitizeHtml(post.content, !!heroSrc);
   const { html: safeHtml, headings } = processHeadings(rawHtml);
   const categoryColor = CATEGORY_COLORS[post.category] ?? "bg-slate-100 text-slate-700 border-slate-200";
+  const categoryBorder = CATEGORY_BORDER[post.category] ?? "border-l-slate-300";
   const scoreColor = score ? (SCORE_COLORS[score.status_label] ?? "text-slate-700 bg-slate-50 border-slate-200") : "";
 
   const jsonLd = {
@@ -279,7 +288,7 @@ export default async function BlogPostPage({ params }: Props) {
             </Link>
           </nav>
 
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className={`bg-white rounded-2xl border border-slate-200 overflow-hidden border-l-4 ${categoryBorder}`}>
             {/* Article header — title first for SEO keyword primacy */}
             <div className="px-6 pt-6 pb-4">
               <div className="flex items-center gap-2 mb-4">
@@ -307,20 +316,7 @@ export default async function BlogPostPage({ params }: Props) {
               </div>
             </div>
 
-            {/* Hero image — after title so H1 keyword is indexed first */}
-            {heroSrc && (
-              <div className="w-full overflow-hidden bg-slate-100 border-t border-b border-slate-100" style={{ height: "340px" }}>
-                <img
-                  src={heroSrc}
-                  alt={post.title}
-                  className="w-full h-full object-cover object-center"
-                  loading="eager"
-                />
-              </div>
-            )}
-
-            {/* Divider shown only when there is no image */}
-            {!heroSrc && <div className="border-t border-slate-100" />}
+            <div className="border-t border-slate-100" />
 
             {/* Article body */}
             <div className="px-6 py-5">

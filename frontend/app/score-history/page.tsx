@@ -99,8 +99,8 @@ export default async function ScoreHistoryPage() {
   const allTimeMin = Math.min(...scores.map((s) => s.health_score));
   const allTimeMax = Math.max(...scores.map((s) => s.health_score));
 
-  // For the sparkline chart — use last 60 entries max for visual clarity
-  const chartScores = scores.slice(-90);
+  // Last 30 days — readable bar widths without crowding
+  const chartScores = scores.slice(-30);
   const chartMax = Math.max(...chartScores.map((s) => s.health_score), 1);
 
   const jsonLd = {
@@ -184,7 +184,7 @@ export default async function ScoreHistoryPage() {
           ))}
         </div>
 
-        {/* Bar chart — last 90 days */}
+        {/* Bar chart — last 30 days */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">
@@ -217,7 +217,7 @@ export default async function ScoreHistoryPage() {
               return (
                 <div
                   key={s.date}
-                  className="flex-1 flex flex-col items-center justify-end group relative"
+                  className="flex-1 h-full flex flex-col items-center justify-end group relative"
                   style={{ minWidth: 0 }}
                   title={`${formatDateShort(s.date)}: ${s.health_score} (${s.status_label})`}
                 >

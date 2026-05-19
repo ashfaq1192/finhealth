@@ -290,8 +290,8 @@ export default async function HomePage() {
           />
         </div>
 
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 h-full flex flex-col">
+        <div className="lg:col-span-2 lg:sticky lg:top-4 self-start">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col">
             {/* Header */}
             <div className="mb-4">
               <p className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1">

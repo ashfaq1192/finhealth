@@ -107,17 +107,7 @@ export default async function BlogIndexPage({ searchParams }: Props) {
                 href={`/blog/${hero.slug}`}
                 className="group block bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-slate-300 transition-all mb-4"
               >
-                {hero.hero_image_url && (
-                  <div className="w-full overflow-hidden bg-slate-100" style={{ height: "240px" }}>
-                    <img
-                      src={hero.hero_image_url}
-                      alt={hero.title}
-                      className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-500"
-                      loading="eager"
-                    />
-                  </div>
-                )}
-                <div className={`p-6 border-l-4 ${heroBorder}`}>
+                <div className={`p-5 border-l-4 ${heroBorder}`}>
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
                       Latest

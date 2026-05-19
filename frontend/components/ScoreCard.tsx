@@ -22,28 +22,28 @@ interface ScoreCardProps {
 const THEME: Record<string, { bar: string; badge: string; score: string; bg: string; border: string }> = {
   Optimal: {
     bar: "bg-green-500",
-    badge: "bg-green-100 text-green-800 border-green-300",
+    badge: "bg-green-500 text-white border-green-600",
     score: "text-green-600",
     bg: "bg-green-50",
     border: "border-green-200",
   },
   Moderate: {
     bar: "bg-sky-500",
-    badge: "bg-sky-100 text-sky-800 border-sky-300",
+    badge: "bg-sky-500 text-white border-sky-600",
     score: "text-sky-700",
     bg: "bg-sky-50",
     border: "border-sky-200",
   },
   Risky: {
     bar: "bg-amber-500",
-    badge: "bg-amber-100 text-amber-800 border-amber-300",
+    badge: "bg-amber-500 text-white border-amber-600",
     score: "text-amber-600",
     bg: "bg-amber-50",
     border: "border-amber-200",
   },
   Critical: {
     bar: "bg-red-500",
-    badge: "bg-red-100 text-red-800 border-red-300",
+    badge: "bg-red-600 text-white border-red-700",
     score: "text-red-600",
     bg: "bg-red-50",
     border: "border-red-200",
@@ -219,7 +219,7 @@ export default function ScoreCard({ score, label, date, reasoning, state, recent
           {date && !animating && (
             <span className={`text-sm ${state === "stale" ? "text-amber-600 font-medium" : "text-slate-400"}`}>
               as of {formatDate(date)}
-              {state === "stale" && " · refresh pending"}
+              {state === "stale" && " · updates at 9 AM ET"}
             </span>
           )}
         </div>
@@ -311,6 +311,21 @@ export default function ScoreCard({ score, label, date, reasoning, state, recent
                     }`}
                   >
                     {parseInt(m)}/{parseInt(d)}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="flex mt-0.5">
+              {recentScores.map((s, i) => {
+                const isLatest = i === recentScores.length - 1;
+                return (
+                  <span
+                    key={s.date}
+                    className={`flex-1 text-center text-[9px] tabular-nums ${
+                      isLatest ? "text-slate-700 font-black" : "text-slate-300"
+                    }`}
+                  >
+                    {s.health_score}
                   </span>
                 );
               })}
