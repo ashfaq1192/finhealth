@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import AffiliateCTA from "@/components/AffiliateCTA";
+import ScoreContextBanner from "@/components/ScoreContextBanner";
+import OtherTools from "@/components/OtherTools";
 
 function fmtCurrency(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -81,6 +83,8 @@ export default function McaCalculator() {
           <span>›</span>
           <span>MCA True Cost Calculator</span>
         </nav>
+
+        <ScoreContextBanner />
 
         <div className="mb-6">
           <p className="text-xs font-bold tracking-widest text-orange-500 uppercase mb-2">Free Tool</p>
@@ -261,6 +265,8 @@ export default function McaCalculator() {
             </Link>
           </div>
         </div>
+
+        <OtherTools currentHref="/tools/mca-calculator" />
 
         <p className="text-[10px] text-slate-400 text-center leading-relaxed">
           Estimates based on inputs provided. Actual MCA costs vary by provider and contract terms.{" "}

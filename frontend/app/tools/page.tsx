@@ -19,7 +19,8 @@ export const metadata: Metadata = {
 const TOOLS = [
   {
     href: "/tools/invoice-factoring-calculator",
-    icon: "📄",
+    iconPath: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    iconColor: "text-blue-500",
     badge: "Most Popular",
     badgeColor: "bg-blue-100 text-blue-700",
     title: "Invoice Factoring Cost Calculator",
@@ -29,7 +30,8 @@ const TOOLS = [
   },
   {
     href: "/tools/mca-calculator",
-    icon: "💳",
+    iconPath: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
+    iconColor: "text-amber-500",
     badge: "Eye-opener",
     badgeColor: "bg-orange-100 text-orange-700",
     title: "MCA True Cost Calculator",
@@ -39,7 +41,8 @@ const TOOLS = [
   },
   {
     href: "/tools/break-even-calculator",
-    icon: "⚖️",
+    iconPath: "M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3",
+    iconColor: "text-violet-500",
     badge: "Essential",
     badgeColor: "bg-green-100 text-green-700",
     title: "Break-Even Calculator",
@@ -49,7 +52,8 @@ const TOOLS = [
   },
   {
     href: "/tools/cash-flow-runway",
-    icon: "🛫",
+    iconPath: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
+    iconColor: "text-sky-500",
     badge: "Critical insight",
     badgeColor: "bg-purple-100 text-purple-700",
     title: "Cash Flow Runway Calculator",
@@ -59,7 +63,8 @@ const TOOLS = [
   },
   {
     href: "/#prime-rate-calculator",
-    icon: "🏦",
+    iconPath: "M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z",
+    iconColor: "text-red-500",
     badge: "Live data",
     badgeColor: "bg-red-100 text-red-700",
     title: "SBA Loan Payment Calculator",
@@ -69,7 +74,8 @@ const TOOLS = [
   },
   {
     href: "/tools/loan-comparison",
-    icon: "📊",
+    iconPath: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
+    iconColor: "text-indigo-500",
     badge: "Most comprehensive",
     badgeColor: "bg-indigo-100 text-indigo-700",
     title: "Business Loan Comparison Tool",
@@ -140,7 +146,11 @@ export default function ToolsPage() {
               className={`group bg-white rounded-2xl border border-slate-200 border-t-4 ${tool.color} p-6 hover:shadow-md transition-all`}
             >
               <div className="flex items-start justify-between gap-3 mb-3">
-                <span className="text-3xl">{tool.icon}</span>
+                <div className={`w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 ${tool.iconColor}`}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={tool.iconPath} />
+                  </svg>
+                </div>
                 <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${tool.badgeColor}`}>
                   {tool.badge}
                 </span>
@@ -163,7 +173,11 @@ export default function ToolsPage() {
         {/* Score cross-link */}
         <div className="bg-slate-900 rounded-2xl p-6 text-white mb-8">
           <div className="flex items-start gap-4">
-            <span className="text-3xl">📊</span>
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
             <div>
               <p className="text-xs font-bold tracking-widest text-blue-400 uppercase mb-1">Live Economic Data</p>
               <h2 className="text-base font-bold mb-2">Today's US Business Funding Climate Score</h2>

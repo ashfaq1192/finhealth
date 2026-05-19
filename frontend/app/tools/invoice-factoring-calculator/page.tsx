@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import AffiliateCTA from "@/components/AffiliateCTA";
+import ScoreContextBanner from "@/components/ScoreContextBanner";
+import OtherTools from "@/components/OtherTools";
 
 // ─── Metadata can't be exported from "use client" — see route segment config below
 // SEO is handled via the generateMetadata pattern but this is a client page.
@@ -91,6 +93,8 @@ export default function InvoiceFactoringCalculator() {
           <span>›</span>
           <span>Invoice Factoring Calculator</span>
         </nav>
+
+        <ScoreContextBanner />
 
         <div className="mb-6">
           <p className="text-xs font-bold tracking-widest text-blue-500 uppercase mb-2">Free Tool</p>
@@ -305,6 +309,8 @@ export default function InvoiceFactoringCalculator() {
             </Link>
           </div>
         </div>
+
+        <OtherTools currentHref="/tools/invoice-factoring-calculator" />
 
         <p className="text-[10px] text-slate-400 text-center leading-relaxed">
           This calculator is for informational purposes only. Results are estimates based on inputs

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import AffiliateCTA from "@/components/AffiliateCTA";
+import ScoreContextBanner from "@/components/ScoreContextBanner";
+import OtherTools from "@/components/OtherTools";
 
 function fmtCurrency(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -103,6 +105,8 @@ export default function CashFlowRunwayCalculator() {
           <span>›</span>
           <span>Cash Flow Runway</span>
         </nav>
+
+        <ScoreContextBanner />
 
         <div className="mb-6">
           <p className="text-xs font-bold tracking-widest text-purple-600 uppercase mb-2">Free Tool</p>
@@ -320,6 +324,8 @@ export default function CashFlowRunwayCalculator() {
             <Link href="/sba-loans" className="text-slate-500 hover:text-slate-700">SBA Loan Guide →</Link>
           </div>
         </div>
+
+        <OtherTools currentHref="/tools/cash-flow-runway" />
 
         <p className="text-[10px] text-slate-400 text-center leading-relaxed">
           Projections are estimates based on constant burn rate. Actual results depend on revenue variability and unplanned expenses.{" "}

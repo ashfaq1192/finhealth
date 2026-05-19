@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import AffiliateCTA from "@/components/AffiliateCTA";
+import ScoreContextBanner from "@/components/ScoreContextBanner";
+import OtherTools from "@/components/OtherTools";
 
 interface Inputs {
   loanAmount: string;
@@ -238,6 +240,8 @@ export default function LoanComparisonPage() {
           <span>›</span>
           <span>Loan Comparison</span>
         </nav>
+
+        <ScoreContextBanner />
 
         {/* Header */}
         <div className="mb-8">
@@ -554,6 +558,8 @@ export default function LoanComparisonPage() {
             </div>
           </div>
         </div>
+
+        <OtherTools currentHref="/tools/loan-comparison" />
 
         {/* Disclaimer */}
         <p className="text-xs text-slate-400 leading-relaxed text-center">
