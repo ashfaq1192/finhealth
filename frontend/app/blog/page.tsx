@@ -59,14 +59,15 @@ interface Props {
 }
 
 async function getPosts(category?: string) {
+  const isAll = !category || category === "All";
   let query = supabase
     .from("blog_posts")
     .select("date, title, slug, meta_description, category, hero_image_url")
     .order("date", { ascending: false })
-    .limit(50);
+    .limit(isAll ? 20 : 50);
 
-  if (category && category !== "All") {
-    query = query.eq("category", category);
+  if (!isAll) {
+    query = query.eq("category", category!);
   }
 
   const { data } = await query;
@@ -165,6 +166,13 @@ export default async function BlogIndexPage({ searchParams }: Props) {
                 );
               })}
             </div>
+          )}
+
+          {/* Browse hint when capped at 20 */}
+          {selected === "All" && posts.length >= 20 && (
+            <p className="text-center text-xs text-slate-400 pt-1 pb-2">
+              Showing 20 most recent · use the category filters above to browse by sector
+            </p>
           )}
         </div>
 

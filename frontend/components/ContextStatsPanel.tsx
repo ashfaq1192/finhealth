@@ -128,7 +128,7 @@ export default function ContextStatsPanel({ cpi_yoy, nfib_optimism }: ContextSta
       ) : (
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300 mb-2">US Inflation (CPI)</p>
-          <p className="text-xs text-slate-400">Fetched daily from FRED · updates with next pipeline run</p>
+          <p className="text-xs text-slate-400">Updated daily · new data posts each morning</p>
         </div>
       )}
 
@@ -181,7 +181,7 @@ export default function ContextStatsPanel({ cpi_yoy, nfib_optimism }: ContextSta
       ) : (
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300 mb-2">NFIB Small Biz Optimism</p>
-          <p className="text-xs text-slate-400">Monthly survey · updates when FRED releases new data</p>
+          <p className="text-xs text-slate-400">Monthly survey · refreshes when FRED publishes new data</p>
         </div>
       )}
     </div>

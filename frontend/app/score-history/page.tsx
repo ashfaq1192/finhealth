@@ -98,6 +98,7 @@ export default async function ScoreHistoryPage() {
   const allTimeAvg = Math.round(scores.reduce((s, r) => s + r.health_score, 0) / scores.length);
   const allTimeMin = Math.min(...scores.map((s) => s.health_score));
   const allTimeMax = Math.max(...scores.map((s) => s.health_score));
+  const allSameZone = scores.every((s) => s.status_label === latest.status_label);
 
   // Last 30 days — readable bar widths without crowding
   const chartScores = scores.slice(-30);
@@ -169,12 +170,12 @@ export default async function ScoreHistoryPage() {
         </div>
 
         {/* Summary stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
           {[
             { label: "Total Data Points", value: scores.length.toString(), sub: "daily scores" },
             { label: "All-Time Average", value: allTimeAvg.toString(), sub: "out of 100" },
-            { label: "All-Time High", value: allTimeMax.toString(), sub: "best conditions" },
-            { label: "All-Time Low", value: allTimeMin.toString(), sub: "worst conditions" },
+            { label: "All-Time High", value: allTimeMax.toString(), sub: "highest recorded" },
+            { label: "All-Time Low", value: allTimeMin.toString(), sub: "lowest recorded" },
           ].map(({ label, value, sub }) => (
             <div key={label} className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
@@ -184,12 +185,29 @@ export default async function ScoreHistoryPage() {
           ))}
         </div>
 
+        {/* Zone consistency note */}
+        {allSameZone && (
+          <p className="text-xs text-slate-400 text-center mb-6">
+            All {scores.length} recorded scores fall in the{" "}
+            <span className={`font-semibold ${
+              latest.status_label === "Optimal" ? "text-green-600"
+              : latest.status_label === "Moderate" ? "text-sky-600"
+              : latest.status_label === "Risky" ? "text-amber-600"
+              : "text-red-600"
+            }`}>
+              {latest.status_label}
+            </span>{" "}
+            zone (score range {allTimeMin}–{allTimeMax})
+          </p>
+        )}
+
         {/* Bar chart — last 30 days */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">
-              Daily Score Chart {chartScores.length < scores.length ? `(last ${chartScores.length} days)` : ""}
-            </p>
+            <div>
+              <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">Daily Score Chart</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">Last 30 days</p>
+            </div>
             <div className="flex items-center gap-3 text-[10px]">
               {[
                 { label: "Optimal (80–100)", color: "bg-green-500" },
