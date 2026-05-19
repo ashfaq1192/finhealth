@@ -51,15 +51,15 @@ function formatDateShort(iso: string): string {
 
 const STATUS_COLORS: Record<string, string> = {
   Optimal:  "bg-green-500",
-  Moderate: "bg-amber-400",
-  Risky:    "bg-orange-500",
+  Moderate: "bg-sky-400",
+  Risky:    "bg-amber-400",
   Critical: "bg-red-500",
 };
 
 const STATUS_TEXT: Record<string, string> = {
   Optimal:  "text-green-700 bg-green-50 border-green-200",
-  Moderate: "text-amber-700 bg-amber-50 border-amber-200",
-  Risky:    "text-orange-700 bg-orange-50 border-orange-200",
+  Moderate: "text-sky-700 bg-sky-50 border-sky-200",
+  Risky:    "text-amber-700 bg-amber-50 border-amber-200",
   Critical: "text-red-700 bg-red-50 border-red-200",
 };
 
@@ -193,8 +193,8 @@ export default async function ScoreHistoryPage() {
             <div className="flex items-center gap-3 text-[10px]">
               {[
                 { label: "Optimal (80–100)", color: "bg-green-500" },
-                { label: "Moderate (60–79)", color: "bg-amber-400" },
-                { label: "Risky (40–59)", color: "bg-orange-500" },
+                { label: "Moderate (60–79)", color: "bg-sky-400" },
+                { label: "Risky (40–59)", color: "bg-amber-400" },
                 { label: "Critical (0–39)", color: "bg-red-500" },
               ].map(({ label, color }) => (
                 <span key={label} className="flex items-center gap-1 text-slate-500">
@@ -211,8 +211,8 @@ export default async function ScoreHistoryPage() {
               const barHeight = Math.max(4, (s.health_score / 100) * 100);
               const barColor =
                 s.health_score >= 80 ? "bg-green-500 hover:bg-green-400"
-                : s.health_score >= 60 ? "bg-amber-400 hover:bg-amber-300"
-                : s.health_score >= 40 ? "bg-orange-500 hover:bg-orange-400"
+                : s.health_score >= 60 ? "bg-sky-400 hover:bg-sky-300"
+                : s.health_score >= 40 ? "bg-amber-400 hover:bg-amber-300"
                 : "bg-red-500 hover:bg-red-400";
               return (
                 <div

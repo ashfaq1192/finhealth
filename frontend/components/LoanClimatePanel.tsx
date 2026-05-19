@@ -57,32 +57,32 @@ const CLIMATE: Record<string, ClimateConfig> = {
   },
   Moderate: {
     headline: "Lending is available but underwriting standards are tightening",
-    headlineColor: "text-amber-800",
-    topBorder: "border-t-4 border-amber-400",
-    headerBg: "bg-amber-50",
+    headlineColor: "text-sky-800",
+    topBorder: "border-t-4 border-sky-400",
+    headerBg: "bg-sky-50",
     icon: "~",
     loans: [
       {
         name: "SBA 7(a) Loans",
         status: "Selective",
-        statusColor: "bg-amber-100 text-amber-700 border-amber-200",
-        cardBg: "bg-amber-50/60 border-amber-100",
+        statusColor: "bg-sky-100 text-sky-700 border-sky-200",
+        cardBg: "bg-sky-50/60 border-sky-100",
         detail:
           "Approval is possible but banks are scrutinizing applications more carefully. Expect longer processing times and stronger collateral requirements.",
       },
       {
         name: "Lines of Credit",
         status: "Cautious",
-        statusColor: "bg-amber-100 text-amber-700 border-amber-200",
-        cardBg: "bg-amber-50/60 border-amber-100",
+        statusColor: "bg-sky-100 text-sky-700 border-sky-200",
+        cardBg: "bg-sky-50/60 border-sky-100",
         detail:
           "Banks are raising documentation requirements on renewals. New applicants need 2+ years of clean financials and a debt-service ratio above 1.35×.",
       },
       {
         name: "Equipment Financing",
         status: "Available",
-        statusColor: "bg-amber-100 text-amber-700 border-amber-200",
-        cardBg: "bg-amber-50/60 border-amber-100",
+        statusColor: "bg-sky-100 text-sky-700 border-sky-200",
+        cardBg: "bg-sky-50/60 border-sky-100",
         detail:
           "Loans are available but at elevated rates. Shorter terms (24–48 months) are being offered to reduce lender exposure.",
       },
@@ -94,32 +94,32 @@ const CLIMATE: Record<string, ClimateConfig> = {
   },
   Risky: {
     headline: "Credit access is restricted — lenders are highly selective",
-    headlineColor: "text-orange-800",
-    topBorder: "border-t-4 border-orange-400",
-    headerBg: "bg-orange-50",
+    headlineColor: "text-amber-800",
+    topBorder: "border-t-4 border-amber-400",
+    headerBg: "bg-amber-50",
     icon: "!",
     loans: [
       {
         name: "SBA 7(a) Loans",
         status: "Difficult",
-        statusColor: "bg-orange-100 text-orange-700 border-orange-200",
-        cardBg: "bg-orange-50/60 border-orange-100",
+        statusColor: "bg-amber-100 text-amber-700 border-amber-200",
+        cardBg: "bg-amber-50/60 border-amber-100",
         detail:
           "Banks are prioritizing existing customers. New applicants face longer delays, stricter collateral requirements, and lower approval loan amounts.",
       },
       {
         name: "Lines of Credit",
         status: "Tight",
-        statusColor: "bg-orange-100 text-orange-700 border-orange-200",
-        cardBg: "bg-orange-50/60 border-orange-100",
+        statusColor: "bg-amber-100 text-amber-700 border-amber-200",
+        cardBg: "bg-amber-50/60 border-amber-100",
         detail:
           "Many lenders are reducing credit limits on renewals. New revolving credit lines are rarely approved without significant hard collateral.",
       },
       {
         name: "Equipment Financing",
         status: "Restricted",
-        statusColor: "bg-orange-100 text-orange-700 border-orange-200",
-        cardBg: "bg-orange-50/60 border-orange-100",
+        statusColor: "bg-amber-100 text-amber-700 border-amber-200",
+        cardBg: "bg-amber-50/60 border-amber-100",
         detail:
           "Available only with strong hard collateral and FICO 720+. Variable-rate loans are especially expensive — seek fixed-rate structures only.",
       },

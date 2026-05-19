@@ -22,8 +22,8 @@ interface TrendChartProps {
 
 const LABEL_COLORS: Record<string, string> = {
   Optimal: "#16a34a",
-  Moderate: "#d97706",
-  Risky: "#ea580c",
+  Moderate: "#0ea5e9",  // sky-500
+  Risky: "#f59e0b",    // amber-500
   Critical: "#dc2626",
 };
 

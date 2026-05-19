@@ -21,18 +21,18 @@ const THEME: Record<string, { bar: string; badge: string; score: string; bg: str
     border: "border-green-200",
   },
   Moderate: {
+    bar: "bg-sky-500",
+    badge: "bg-sky-100 text-sky-800 border-sky-300",
+    score: "text-sky-700",
+    bg: "bg-sky-50",
+    border: "border-sky-200",
+  },
+  Risky: {
     bar: "bg-amber-500",
     badge: "bg-amber-100 text-amber-800 border-amber-300",
     score: "text-amber-600",
     bg: "bg-amber-50",
     border: "border-amber-200",
-  },
-  Risky: {
-    bar: "bg-orange-500",
-    badge: "bg-orange-100 text-orange-800 border-orange-300",
-    score: "text-orange-600",
-    bg: "bg-orange-50",
-    border: "border-orange-200",
   },
   Critical: {
     bar: "bg-red-500",
@@ -62,8 +62,8 @@ function formatDate(iso: string): string {
 
 const ZONE_LABELS = [
   { label: "Critical", color: "bg-red-400", width: "w-[40%]" },
-  { label: "Risky", color: "bg-orange-400", width: "w-[20%]" },
-  { label: "Moderate", color: "bg-amber-400", width: "w-[20%]" },
+  { label: "Risky", color: "bg-amber-400", width: "w-[20%]" },
+  { label: "Moderate", color: "bg-sky-400", width: "w-[20%]" },
   { label: "Optimal", color: "bg-green-400", width: "w-[20%]" },
 ];
 

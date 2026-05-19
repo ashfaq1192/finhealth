@@ -27,8 +27,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const SCORE_COLORS: Record<string, string> = {
   Optimal:  "text-green-600 bg-green-50 border-green-200",
-  Moderate: "text-amber-600 bg-amber-50 border-amber-200",
-  Risky:    "text-orange-600 bg-orange-50 border-orange-200",
+  Moderate: "text-sky-700 bg-sky-50 border-sky-200",
+  Risky:    "text-amber-600 bg-amber-50 border-amber-200",
   Critical: "text-red-600 bg-red-50 border-red-200",
 };
 
