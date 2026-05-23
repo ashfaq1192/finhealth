@@ -127,8 +127,20 @@ def _call_gemini_direct(system_prompt: str, user_prompt: str, max_tokens: int) -
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as http_err:
+        body = ""
+        try:
+            body = http_err.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        print(
+            f"[gemini] HTTP {http_err.code} from Google API. Body: {body[:500]!r}",
+            file=sys.stderr, flush=True,
+        )
+        raise
     candidates = result.get("candidates", [])
     if not candidates:
         raise RuntimeError(f"Gemini returned no candidates: {result}")
