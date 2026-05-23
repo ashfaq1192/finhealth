@@ -499,7 +499,7 @@ def run() -> int:
             print(f"[crew] QA GATE FAILED: {qa_reason}.", file=sys.stderr)
             # Low word count = truncated response from Groq TPM throttle.
             # Retry the editor with Gemini using the writer draft.
-            if "word count" in qa_reason and writer_output and os.environ.get("GEMINI_API_KEY"):
+            if "word count" in qa_reason.lower() and writer_output and os.environ.get("GEMINI_API_KEY"):
                 print("[crew] Retrying editor with Gemini (truncation detected)...", flush=True)
                 try:
                     _crew_qa_retry: dict[str, Any] = {}
