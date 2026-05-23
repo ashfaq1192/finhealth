@@ -492,12 +492,64 @@ def run() -> int:
             raw_content,
         ).rstrip()
 
-    # Step 3b: QA gate
+    # Step 3b: QA gate — with Gemini retry if word count is too low (truncated response)
     if post_data:
         qa_passed, qa_reason = _qa_post_content(post_data)
         if not qa_passed:
-            print(f"[crew] QA GATE FAILED: {qa_reason}. Blog post discarded.", file=sys.stderr)
-            post_data = None
+            print(f"[crew] QA GATE FAILED: {qa_reason}.", file=sys.stderr)
+            # Low word count = truncated response from Groq TPM throttle.
+            # Retry the editor with Gemini using the writer draft.
+            if "word count" in qa_reason and writer_output and os.environ.get("GEMINI_API_KEY"):
+                print("[crew] Retrying editor with Gemini (truncation detected)...", flush=True)
+                try:
+                    _crew_qa_retry: dict[str, Any] = {}
+                    _cat_qa = (
+                        calendar_entry.get("category") if calendar_entry else get_todays_category()
+                    )
+                    from tasks import CATEGORY_SEO as _CSEO2
+                    _kw_qa = _CSEO2.get(_cat_qa, {}).get("primary", "small business funding")
+
+                    def _kickoff_gemini_editor() -> None:
+                        edt = build_editor_task(
+                            writer_output, score_json, _cat_qa, _kw_qa,
+                            editor=make_editor(gemini_llm(max_tokens=5500)),
+                        )
+                        c = Crew(
+                            agents=[edt.agent],
+                            tasks=[edt],
+                            process=Process.sequential,
+                            verbose=False,
+                        )
+                        _crew_qa_retry["output"] = c.kickoff()
+                        _crew_qa_retry["task"] = edt
+
+                    _retry(_kickoff_gemini_editor, attempts=2, delays=[30],
+                           label="Crew2/Gemini QA-retry editor")
+
+                    _r2 = _crew_qa_retry["output"]
+                    _to2 = getattr(_r2, "tasks_output", [])
+                    _gemini_editor_out = _to2[0].raw if _to2 else ""
+                    if not _gemini_editor_out:
+                        _gemini_editor_out = (
+                            getattr(getattr(_crew_qa_retry["task"], "output", None), "raw", "") or ""
+                        )
+                    if _gemini_editor_out:
+                        post_data = _parse_json_output(_gemini_editor_out)
+                        qa_passed2, qa_reason2 = _qa_post_content(post_data)
+                        if qa_passed2:
+                            wc = len(post_data["content"].split())
+                            print(f"[crew] Gemini editor QA passed: {wc} words.", flush=True)
+                        else:
+                            print(f"[crew] Gemini editor QA also failed: {qa_reason2}. Discarding.", file=sys.stderr)
+                            post_data = None
+                    else:
+                        post_data = None
+                except Exception as _qe:
+                    print(f"[crew] Gemini QA-retry failed: {_qe}. Discarding.", file=sys.stderr)
+                    post_data = None
+            else:
+                print("[crew] Blog post discarded.", file=sys.stderr)
+                post_data = None
         else:
             wc = len(post_data["content"].split())
             print(f"[crew] QA gate passed: {wc} words, structure OK.", flush=True)

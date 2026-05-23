@@ -8,6 +8,10 @@ on:
         required: true
         default: ""
 
+concurrency:
+  group: finhealth-pipeline
+  cancel-in-progress: false
+
 jobs:
   backfill:
     name: Generate & publish post for ${{ inputs.target_date }}
