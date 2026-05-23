@@ -37,6 +37,7 @@ from tasks import build_tasks, build_editor_task, get_todays_category
 
 from crewai import Crew, Process
 from agents import economist_agent, writer_agent, editor_agent
+from agents import make_economist, make_writer, make_editor, gemini_llm
 from digest import send_daily_digest
 
 
@@ -97,6 +98,16 @@ def _retry(fn: Callable[[], _T], *, attempts: int, delays: list[int], label: str
                 )
                 time.sleep(wait)
     raise last_exc  # type: ignore[misc]
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    """Return True if the exception looks like a provider rate-limit / quota error."""
+    msg = str(exc).lower()
+    return any(
+        tok in msg
+        for tok in ("429", "rate limit", "rate_limit", "quota_exceeded",
+                    "resource exhausted", "too many requests", "daily limit")
+    )
 
 
 def _parse_json_output(raw: str) -> dict | list:
@@ -215,7 +226,9 @@ def run() -> int:
     else:
         print("[crew] No content calendar entry for today — using default category rotation", flush=True)
 
-    # Step 0b: Verify Groq API is reachable before spending 3 FRED calls on a doomed run
+    # Step 0b: Verify Groq API is reachable before spending 3 FRED calls on a doomed run.
+    # Rate-limit (429) is non-fatal here — we fall back to Gemini for the LLM steps.
+    groq_ok = True
     try:
         from groq import Groq as _Groq
         _groq_test = _Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -226,9 +239,17 @@ def run() -> int:
         )
         print("[crew] Groq API connectivity: OK", flush=True)
     except Exception as _groq_exc:
-        print(f"[crew] FATAL: Groq API test failed: {_groq_exc}", file=sys.stderr, flush=True)
-        traceback.print_exc(file=sys.stderr)
-        return 1
+        if _is_rate_limit(_groq_exc):
+            print(
+                f"[crew] Groq daily token cap hit ({_groq_exc}) — "
+                "will use Gemini fallback for all LLM tasks.",
+                flush=True,
+            )
+            groq_ok = False
+        else:
+            print(f"[crew] FATAL: Groq API unreachable: {_groq_exc}", file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+            return 1
 
     # Step 1: Fetch FRED indicators — 3 attempts, 10s / 30s gaps
     # FRED is a public government API; occasional 503s or slow responses are the typical failure.
@@ -259,24 +280,68 @@ def run() -> int:
 
     # Step 3 — Crew 1: economist (8b, 20K TPM pool) + writer (70b, 6K TPM pool)
     # These two agents use SEPARATE Groq TPM pools — no rate conflict within Crew 1.
+    # If Groq is rate-limited (daily cap), we fall back to Gemini automatically.
     economist_output = ""
     writer_output = ""
-    try:
-        _crew1_result: dict[str, Any] = {}
+    _topic_override = calendar_entry.get("topic") if calendar_entry else None
 
-        def _kickoff_crew1() -> None:
-            topic_override = calendar_entry.get("topic") if calendar_entry else None
-            et, wt = build_tasks(indicators_json, score_json, topic_override=topic_override)
+    _crew1_result: dict[str, Any] = {}
+
+    def _make_crew1_kickoff(econ_agent, write_agent):
+        def _fn() -> None:
+            et, wt = build_tasks(
+                indicators_json, score_json,
+                topic_override=_topic_override,
+                economist=econ_agent,
+                writer=write_agent,
+            )
             c = Crew(
-                agents=[economist_agent, writer_agent],
+                agents=[econ_agent, write_agent],
                 tasks=[et, wt],
                 process=Process.sequential,
                 verbose=False,
             )
             _crew1_result["output"] = c.kickoff()
             _crew1_result["tasks"] = (et, wt)
+        return _fn
 
-        _retry(_kickoff_crew1, attempts=3, delays=[60, 120], label="Crew1/writer kickoff")
+    try:
+        if groq_ok:
+            try:
+                _retry(
+                    _make_crew1_kickoff(economist_agent, writer_agent),
+                    attempts=3, delays=[60, 120], label="Crew1/Groq kickoff",
+                )
+            except Exception as _groq_crew1_exc:
+                if _is_rate_limit(_groq_crew1_exc) and os.environ.get("GEMINI_API_KEY"):
+                    print(
+                        f"[crew] Crew1/Groq rate-limited after retries — switching to Gemini.",
+                        flush=True,
+                    )
+                    _g_llm = gemini_llm(max_tokens=5000)
+                    _retry(
+                        _make_crew1_kickoff(
+                            make_economist(gemini_llm(max_tokens=1200)),
+                            make_writer(_g_llm),
+                        ),
+                        attempts=2, delays=[30], label="Crew1/Gemini kickoff",
+                    )
+                else:
+                    raise
+        else:
+            # Groq already rate-limited at precheck — go straight to Gemini
+            if os.environ.get("GEMINI_API_KEY"):
+                print("[crew] Using Gemini for Crew1 (Groq rate-limited at precheck).", flush=True)
+                _g_llm = gemini_llm(max_tokens=5000)
+                _retry(
+                    _make_crew1_kickoff(
+                        make_economist(gemini_llm(max_tokens=1200)),
+                        make_writer(_g_llm),
+                    ),
+                    attempts=2, delays=[30], label="Crew1/Gemini kickoff",
+                )
+            else:
+                raise RuntimeError("Groq rate-limited and GEMINI_API_KEY not set — cannot run Crew1.")
 
         result1 = _crew1_result["output"]
         economist_task, writer_task = _crew1_result["tasks"]
@@ -321,6 +386,7 @@ def run() -> int:
     # Runs in a SEPARATE crew after a 75s sleep so the 70b TPM window resets fully.
     # The writer draft is embedded directly in the editor task description — no CrewAI
     # context accumulation — giving the editor a clean, bounded prompt every time.
+    # If Groq is rate-limited, we use a Gemini editor and skip the TPM sleep.
     post_data = None
     if writer_output:
         category_for_editor = (
@@ -329,24 +395,55 @@ def run() -> int:
         from tasks import CATEGORY_SEO as _CSEO
         primary_kw = _CSEO.get(category_for_editor, {}).get("primary", "small business funding")
 
-        print("[crew] Waiting 75s for Groq 70b TPM window to reset before editor...", flush=True)
-        time.sleep(75)
+        _crew2_result: dict[str, Any] = {}
 
-        try:
-            _crew2_result: dict[str, Any] = {}
-
-            def _kickoff_crew2() -> None:
-                edt = build_editor_task(writer_output, score_json, category_for_editor, primary_kw)
+        def _make_crew2_kickoff(edit_agent):
+            def _fn() -> None:
+                edt = build_editor_task(
+                    writer_output, score_json, category_for_editor, primary_kw,
+                    editor=edit_agent,
+                )
                 c = Crew(
-                    agents=[editor_agent],
+                    agents=[edit_agent],
                     tasks=[edt],
                     process=Process.sequential,
                     verbose=False,
                 )
                 _crew2_result["output"] = c.kickoff()
                 _crew2_result["task"] = edt
+            return _fn
 
-            _retry(_kickoff_crew2, attempts=2, delays=[75], label="Crew2/editor kickoff")
+        try:
+            if groq_ok:
+                print("[crew] Waiting 75s for Groq 70b TPM window to reset before editor...", flush=True)
+                time.sleep(75)
+                try:
+                    _retry(
+                        _make_crew2_kickoff(editor_agent),
+                        attempts=2, delays=[75], label="Crew2/Groq editor kickoff",
+                    )
+                except Exception as _groq_crew2_exc:
+                    if _is_rate_limit(_groq_crew2_exc) and os.environ.get("GEMINI_API_KEY"):
+                        print(
+                            "[crew] Crew2/Groq rate-limited — switching editor to Gemini.",
+                            flush=True,
+                        )
+                        _retry(
+                            _make_crew2_kickoff(make_editor(gemini_llm(max_tokens=5500))),
+                            attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
+                        )
+                    else:
+                        raise
+            else:
+                # Groq already rate-limited — use Gemini editor, no TPM sleep needed
+                if os.environ.get("GEMINI_API_KEY"):
+                    print("[crew] Using Gemini for Crew2/editor (Groq rate-limited).", flush=True)
+                    _retry(
+                        _make_crew2_kickoff(make_editor(gemini_llm(max_tokens=5500))),
+                        attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
+                    )
+                else:
+                    raise RuntimeError("Groq rate-limited and GEMINI_API_KEY not set — cannot run Crew2.")
 
             result2 = _crew2_result["output"]
             editor_task_obj = _crew2_result["task"]

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from crewai import Task
 
 from agents import economist_agent, writer_agent, editor_agent
+from crewai import Agent as _Agent
 
 CATEGORIES = ["Trucking", "Retail", "SBA Loans", "Macro", "Staffing"]
 
@@ -100,6 +101,8 @@ def build_tasks(
     indicators_json: str,
     score_json: str,
     topic_override: str | None = None,
+    economist: "_Agent | None" = None,
+    writer: "_Agent | None" = None,
 ) -> tuple[Task, Task]:
     """
     Build the two CrewAI tasks for a pipeline run.
@@ -110,7 +113,13 @@ def build_tasks(
 
     topic_override: when set (from content_calendar), the writer is directed to
                     write about this specific pre-planned topic instead of a generic category post.
+    economist / writer: optional Agent overrides — used when falling back to Gemini.
     """
+    if economist is None:
+        economist = economist_agent
+    if writer is None:
+        writer = writer_agent
+
     today = datetime.now(timezone.utc).date().isoformat()
     category = get_todays_category()
     seo = CATEGORY_SEO[category]
@@ -148,7 +157,7 @@ def build_tasks(
             "causal bullet: sentence 1 states the indicator value with unit, sentence 2 "
             "names the transmission mechanism connecting it to small business credit access."
         ),
-        agent=economist_agent,
+        agent=economist,
     )
 
     import json as _json
@@ -289,7 +298,7 @@ def build_tasks(
             "A JSON object with keys: title, slug, content (1200+ word evergreen markdown), "
             "meta_description."
         ),
-        agent=writer_agent,
+        agent=writer,
         context=[economist_task],
     )
 
@@ -301,6 +310,7 @@ def build_editor_task(
     score_json: str,
     category: str,
     primary_keyword: str,
+    editor: "_Agent | None" = None,
 ) -> Task:
     """
     Build the editor task for Crew 2, with the writer's draft embedded directly.
@@ -308,7 +318,11 @@ def build_editor_task(
 
     The editor has exactly 6 non-negotiable checks. The instructions are precise
     and bounded so the 70b model stays on task without producing a summary.
+    editor: optional Agent override — used when falling back to Gemini.
     """
+    if editor is None:
+        editor = editor_agent
+
     import json as _json
     score_data = _json.loads(score_json)
     score_val = score_data.get("health_score", "N/A")
@@ -386,5 +400,5 @@ def build_editor_task(
             "meta_description (one sentence, period, max 140 chars, primary keyword), "
             "content (1,100-1,500 word publication-ready markdown, no H1, no code fences)."
         ),
-        agent=editor_agent,
+        agent=editor,
     )
