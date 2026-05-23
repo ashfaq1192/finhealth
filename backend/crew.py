@@ -37,7 +37,6 @@ from tasks import build_tasks, build_editor_task, get_todays_category
 
 from crewai import Crew, Process
 from agents import economist_agent, writer_agent, editor_agent
-from agents import make_economist, make_writer, make_editor, gemini_llm
 from digest import send_daily_digest
 
 
@@ -108,6 +107,93 @@ def _is_rate_limit(exc: Exception) -> bool:
         for tok in ("429", "rate limit", "rate_limit", "quota_exceeded",
                     "resource exhausted", "too many requests", "daily limit")
     )
+
+
+def _call_gemini_direct(system_prompt: str, user_prompt: str, max_tokens: int) -> str:
+    """
+    Direct HTTP call to Google Gemini REST API, bypassing crewai/litellm routing.
+    Uses urllib.request (stdlib) — no extra dependencies.
+    """
+    api_key = os.environ["GEMINI_API_KEY"]
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.0-flash:generateContent?key={api_key}"
+    )
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": max_tokens},
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        result = json.loads(resp.read().decode("utf-8"))
+    candidates = result.get("candidates", [])
+    if not candidates:
+        raise RuntimeError(f"Gemini returned no candidates: {result}")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    if not parts:
+        raise RuntimeError(f"Gemini returned empty parts: {result}")
+    return parts[0].get("text", "")
+
+
+def _gemini_run_crew1(
+    indicators_json: str,
+    score_json: str,
+    topic_override: str | None,
+) -> tuple[str, str]:
+    """
+    Run economist + writer via direct Gemini REST API calls (no crewai routing).
+    Returns (economist_output, writer_output) as raw strings.
+    """
+    from tasks import build_tasks
+
+    # Build tasks just to extract their descriptions; we never run a Crew.
+    econ_task, writer_task = build_tasks(
+        indicators_json, score_json, topic_override=topic_override
+    )
+    economist_system = (
+        "You are a Senior US Macroeconomist with 15 years at the Federal Reserve Bank of Atlanta "
+        "studying small business credit markets. Think in transmission mechanisms — never vague "
+        "phrases like 'lenders are cautious'. Every claim cites the actual value with unit, then "
+        "explains the mechanism connecting it to loan approval rates or borrowing costs. "
+        "Write exclusively in American English: 'labor', 'analyze', not British variants."
+    )
+    econ_out = _call_gemini_direct(economist_system, econ_task.description, max_tokens=1200)
+
+    writer_system = (
+        "You are a US Small Business Finance Journalist with 15 years covering small business "
+        "lending for Inc. Magazine, Forbes Small Business, and NerdWallet. "
+        "Write for Main Street, not Wall Street. "
+        "American English by reflex: FICO score, SBA 7(a) loan, prime rate, invoice factoring. "
+        "Every number includes its unit AND a plain-English impact statement."
+    )
+    writer_prompt = (
+        f"{writer_task.description}\n\n"
+        f"ECONOMIST ANALYSIS (use as supporting context for the article):\n{econ_out}"
+    )
+    writer_out = _call_gemini_direct(writer_system, writer_prompt, max_tokens=5000)
+    return econ_out, writer_out
+
+
+def _gemini_run_editor(
+    writer_draft: str,
+    score_json: str,
+    category: str,
+    primary_keyword: str,
+) -> str:
+    """Run the editor step via direct Gemini REST API call (no crewai routing)."""
+    from tasks import build_editor_task
+
+    edt = build_editor_task(writer_draft, score_json, category, primary_keyword)
+    editor_system = (
+        "You are the Chief Editorial Director of a major US financial media brand. "
+        "Apply editorial checks precisely: fix every failure, return only valid JSON. "
+        "Never summarize or shorten — preserve all substance and expand where word count is low. "
+        "Write in American English only."
+    )
+    return _call_gemini_direct(editor_system, edt.description, max_tokens=5500)
 
 
 def _parse_json_output(raw: str) -> dict | list:
@@ -305,6 +391,7 @@ def run() -> int:
             _crew1_result["tasks"] = (et, wt)
         return _fn
 
+    _crew1_ran_groq = False
     try:
         if groq_ok:
             try:
@@ -312,18 +399,15 @@ def run() -> int:
                     _make_crew1_kickoff(economist_agent, writer_agent),
                     attempts=3, delays=[60, 120], label="Crew1/Groq kickoff",
                 )
+                _crew1_ran_groq = True
             except Exception as _groq_crew1_exc:
                 if _is_rate_limit(_groq_crew1_exc) and os.environ.get("GEMINI_API_KEY"):
                     print(
-                        f"[crew] Crew1/Groq rate-limited after retries — switching to Gemini.",
+                        "[crew] Crew1/Groq rate-limited after retries — switching to Gemini (direct API).",
                         flush=True,
                     )
-                    _g_llm = gemini_llm(max_tokens=5000)
-                    _retry(
-                        _make_crew1_kickoff(
-                            make_economist(gemini_llm(max_tokens=1200)),
-                            make_writer(_g_llm),
-                        ),
+                    economist_output, writer_output = _retry(
+                        lambda: _gemini_run_crew1(indicators_json, score_json, _topic_override),
                         attempts=2, delays=[30], label="Crew1/Gemini kickoff",
                     )
                 else:
@@ -331,29 +415,24 @@ def run() -> int:
         else:
             # Groq already rate-limited at precheck — go straight to Gemini
             if os.environ.get("GEMINI_API_KEY"):
-                print("[crew] Using Gemini for Crew1 (Groq rate-limited at precheck).", flush=True)
-                _g_llm = gemini_llm(max_tokens=5000)
-                _retry(
-                    _make_crew1_kickoff(
-                        make_economist(gemini_llm(max_tokens=1200)),
-                        make_writer(_g_llm),
-                    ),
+                print("[crew] Using Gemini for Crew1 (Groq rate-limited at precheck, direct API).", flush=True)
+                economist_output, writer_output = _retry(
+                    lambda: _gemini_run_crew1(indicators_json, score_json, _topic_override),
                     attempts=2, delays=[30], label="Crew1/Gemini kickoff",
                 )
             else:
                 raise RuntimeError("Groq rate-limited and GEMINI_API_KEY not set — cannot run Crew1.")
 
-        result1 = _crew1_result["output"]
-        economist_task, writer_task = _crew1_result["tasks"]
-
-        tasks_output1 = getattr(result1, "tasks_output", [])
-        economist_output = tasks_output1[0].raw if len(tasks_output1) > 0 else ""
-        writer_output   = tasks_output1[1].raw if len(tasks_output1) > 1 else ""
-
-        if not economist_output:
-            economist_output = getattr(getattr(economist_task, "output", None), "raw", "") or ""
-        if not writer_output:
-            writer_output = getattr(getattr(writer_task, "output", None), "raw", "") or ""
+        if _crew1_ran_groq:
+            result1 = _crew1_result["output"]
+            economist_task, writer_task = _crew1_result["tasks"]
+            tasks_output1 = getattr(result1, "tasks_output", [])
+            economist_output = tasks_output1[0].raw if len(tasks_output1) > 0 else ""
+            writer_output   = tasks_output1[1].raw if len(tasks_output1) > 1 else ""
+            if not economist_output:
+                economist_output = getattr(getattr(economist_task, "output", None), "raw", "") or ""
+            if not writer_output:
+                writer_output = getattr(getattr(writer_task, "output", None), "raw", "") or ""
 
         print(f"[crew] Economist output preview: {economist_output[:120]}", flush=True)
         print(f"[crew] Writer output preview: {writer_output[:120]}", flush=True)
@@ -413,6 +492,7 @@ def run() -> int:
                 _crew2_result["task"] = edt
             return _fn
 
+        editor_output = ""
         try:
             if groq_ok:
                 print("[crew] Waiting 75s for Groq 70b TPM window to reset before editor...", flush=True)
@@ -422,14 +502,22 @@ def run() -> int:
                         _make_crew2_kickoff(editor_agent),
                         attempts=2, delays=[75], label="Crew2/Groq editor kickoff",
                     )
+                    result2 = _crew2_result["output"]
+                    editor_task_obj = _crew2_result["task"]
+                    tasks_output2 = getattr(result2, "tasks_output", [])
+                    editor_output = tasks_output2[0].raw if len(tasks_output2) > 0 else ""
+                    if not editor_output:
+                        editor_output = getattr(getattr(editor_task_obj, "output", None), "raw", "") or ""
                 except Exception as _groq_crew2_exc:
                     if _is_rate_limit(_groq_crew2_exc) and os.environ.get("GEMINI_API_KEY"):
                         print(
-                            "[crew] Crew2/Groq rate-limited — switching editor to Gemini.",
+                            "[crew] Crew2/Groq rate-limited — switching editor to Gemini (direct API).",
                             flush=True,
                         )
-                        _retry(
-                            _make_crew2_kickoff(make_editor(gemini_llm(max_tokens=5500))),
+                        editor_output = _retry(
+                            lambda: _gemini_run_editor(
+                                writer_output, score_json, category_for_editor, primary_kw
+                            ),
                             attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
                         )
                     else:
@@ -437,21 +525,15 @@ def run() -> int:
             else:
                 # Groq already rate-limited — use Gemini editor, no TPM sleep needed
                 if os.environ.get("GEMINI_API_KEY"):
-                    print("[crew] Using Gemini for Crew2/editor (Groq rate-limited).", flush=True)
-                    _retry(
-                        _make_crew2_kickoff(make_editor(gemini_llm(max_tokens=5500))),
+                    print("[crew] Using Gemini for Crew2/editor (Groq rate-limited, direct API).", flush=True)
+                    editor_output = _retry(
+                        lambda: _gemini_run_editor(
+                            writer_output, score_json, category_for_editor, primary_kw
+                        ),
                         attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
                     )
                 else:
                     raise RuntimeError("Groq rate-limited and GEMINI_API_KEY not set — cannot run Crew2.")
-
-            result2 = _crew2_result["output"]
-            editor_task_obj = _crew2_result["task"]
-
-            tasks_output2 = getattr(result2, "tasks_output", [])
-            editor_output = tasks_output2[0].raw if len(tasks_output2) > 0 else ""
-            if not editor_output:
-                editor_output = getattr(getattr(editor_task_obj, "output", None), "raw", "") or ""
 
             print(f"[crew] Editor output preview: {editor_output[:120]}", flush=True)
 
@@ -500,39 +582,14 @@ def run() -> int:
             # Low word count = truncated response from Groq TPM throttle.
             # Retry the editor with Gemini using the writer draft.
             if "word count" in qa_reason.lower() and writer_output and os.environ.get("GEMINI_API_KEY"):
-                print("[crew] Retrying editor with Gemini (truncation detected)...", flush=True)
+                print("[crew] Retrying editor with Gemini direct API (truncation detected)...", flush=True)
                 try:
-                    _crew_qa_retry: dict[str, Any] = {}
-                    _cat_qa = (
-                        calendar_entry.get("category") if calendar_entry else get_todays_category()
+                    _gemini_editor_out = _retry(
+                        lambda: _gemini_run_editor(
+                            writer_output, score_json, category_for_editor, primary_kw
+                        ),
+                        attempts=2, delays=[30], label="Crew2/Gemini QA-retry editor",
                     )
-                    from tasks import CATEGORY_SEO as _CSEO2
-                    _kw_qa = _CSEO2.get(_cat_qa, {}).get("primary", "small business funding")
-
-                    def _kickoff_gemini_editor() -> None:
-                        edt = build_editor_task(
-                            writer_output, score_json, _cat_qa, _kw_qa,
-                            editor=make_editor(gemini_llm(max_tokens=5500)),
-                        )
-                        c = Crew(
-                            agents=[edt.agent],
-                            tasks=[edt],
-                            process=Process.sequential,
-                            verbose=False,
-                        )
-                        _crew_qa_retry["output"] = c.kickoff()
-                        _crew_qa_retry["task"] = edt
-
-                    _retry(_kickoff_gemini_editor, attempts=2, delays=[30],
-                           label="Crew2/Gemini QA-retry editor")
-
-                    _r2 = _crew_qa_retry["output"]
-                    _to2 = getattr(_r2, "tasks_output", [])
-                    _gemini_editor_out = _to2[0].raw if _to2 else ""
-                    if not _gemini_editor_out:
-                        _gemini_editor_out = (
-                            getattr(getattr(_crew_qa_retry["task"], "output", None), "raw", "") or ""
-                        )
                     if _gemini_editor_out:
                         post_data = _parse_json_output(_gemini_editor_out)
                         qa_passed2, qa_reason2 = _qa_post_content(post_data)
