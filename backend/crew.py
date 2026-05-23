@@ -210,7 +210,7 @@ def _fetch_calendar_entry(supabase_client, today: str) -> dict | None:
 
 def run() -> int:
     """Execute the full pipeline. Returns 0 on success, 1 on failure."""
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = os.environ.get("BACKFILL_DATE") or datetime.now(timezone.utc).date().isoformat()
     print(f"[crew] Starting pipeline for {today}", flush=True)
 
     # Step 0: Check content_calendar for a pre-planned topic + pre-generated hero image
