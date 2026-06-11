@@ -4,6 +4,9 @@ on:
   schedule:
     # 14:00 UTC = 09:00 AM EST / 10:00 AM EDT
     - cron: "0 14 * * *"
+    # 20:00 UTC retry — crew.py exits 0 immediately if the morning run already
+    # published, so this only does work on days the first run failed.
+    - cron: "0 20 * * *"
   workflow_dispatch:
     # Allow manual trigger from GitHub Actions UI
 

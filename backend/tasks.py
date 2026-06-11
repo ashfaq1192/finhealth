@@ -15,6 +15,18 @@ from crewai import Agent as _Agent
 
 CATEGORIES = ["Trucking", "Retail", "SBA Loans", "Macro", "Staffing"]
 
+# One evergreen cornerstone URL per category. Days without a content_calendar
+# topic REFRESH these pages with today's data instead of minting a new URL —
+# republishing the same keyword under new dated URLs is what Google's scaled
+# content abuse policy penalizes.
+CANONICAL_SLUGS = {
+    "Trucking": "invoice-factoring-for-trucking-companies",
+    "Retail": "merchant-cash-advance-for-retail-businesses",
+    "SBA Loans": "sba-loan-eligibility-requirements",
+    "Macro": "small-business-funding-conditions",
+    "Staffing": "invoice-factoring-for-staffing-agencies",
+}
+
 # Primary keyword + secondary (long-tail) per category
 CATEGORY_SEO = {
     "Trucking": {
@@ -103,6 +115,8 @@ def build_tasks(
     topic_override: str | None = None,
     economist: "_Agent | None" = None,
     writer: "_Agent | None" = None,
+    category_override: str | None = None,
+    keyword_override: str | None = None,
 ) -> tuple[Task, Task]:
     """
     Build the two CrewAI tasks for a pipeline run.
@@ -111,8 +125,11 @@ def build_tasks(
     Two-task design keeps total token usage well within Groq free-tier limits:
       economist (8b): ~1,300 tokens   writer (70b): ~3,000 tokens
 
-    topic_override: when set (from content_calendar), the writer is directed to
-                    write about this specific pre-planned topic instead of a generic category post.
+    topic_override:    when set (from content_calendar), the writer is directed to
+                       write about this specific pre-planned topic instead of a generic category post.
+    category_override: category from content_calendar (falls back to day-of-year rotation).
+    keyword_override:  long-tail seo_keyword from content_calendar — replaces the category's
+                       primary keyword so each calendar post targets a DISTINCT search term.
     economist / writer: optional Agent overrides — used when falling back to Gemini.
     """
     if economist is None:
@@ -121,8 +138,9 @@ def build_tasks(
         writer = writer_agent
 
     today = datetime.now(timezone.utc).date().isoformat()
-    category = get_todays_category()
-    seo = CATEGORY_SEO[category]
+    category = category_override or get_todays_category()
+    seo = CATEGORY_SEO.get(category, CATEGORY_SEO["Macro"])
+    primary_keyword = (keyword_override or "").strip() or seo["primary"]
 
     economist_task = Task(
         description=(
@@ -181,7 +199,7 @@ def build_tasks(
             f"They have 5 minutes. They scan before they read. They want facts, not reassurance.\n\n"
             + topic_directive
             + f"INDUSTRY: {category}\n"
-            f"PRIMARY KEYWORD: \"{seo['primary']}\"\n"
+            f"PRIMARY KEYWORD: \"{primary_keyword}\"\n"
             f"SECONDARY KEYWORDS: {seo['secondary']}\n\n"
             f"INDUSTRY CONTEXT:\n{seo['industry_context']}\n\n"
             f"ECONOMIC INDICATORS (cite exact values in the article):\n{indicators_json}\n\n"
@@ -214,9 +232,14 @@ def build_tasks(
             "   by a paragraph answer. No Q:/A: labels, no bullets. Format:\n\n"
             "   ### [question text here]\n\n"
             "   [Answer in 3-4 sentences. Be specific. Cite current conditions.]\n\n"
-            "   Repeat for all 3 questions:\n"
-            + "\n".join(f"   - {q}" for q in seo["faq"]) + "\n\n"
-            "US LANGUAGE RULES (mandatory — you are writing for a US audience):\n"
+            + (
+                "   Write 3 questions a searcher of the primary keyword would actually "
+                "ask about THIS specific topic (not generic category questions).\n\n"
+                if topic_override
+                else "   Repeat for all 3 questions:\n"
+                + "\n".join(f"   - {q}" for q in seo["faq"]) + "\n\n"
+            )
+            + "US LANGUAGE RULES (mandatory — you are writing for a US audience):\n"
             "- American English spelling ONLY: 'labor' not 'labour', 'analyze' not 'analyse',\n"
             "  'optimize' not 'optimise', 'color' not 'colour', 'favor' not 'favour'.\n"
             "- Use US financial jargon: FICO score, SBA 7(a) loan, Fed funds rate, "

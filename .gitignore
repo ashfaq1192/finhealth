@@ -34,3 +34,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.iml
+
+# One-time DB backups from consolidation scripts
+backend/backups/

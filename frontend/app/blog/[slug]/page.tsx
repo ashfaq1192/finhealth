@@ -1,7 +1,8 @@
 export const runtime = "edge";
 
 import { supabase } from "@/lib/supabase";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import blogRedirects from "@/lib/blog-redirects.json";
 import { marked } from "marked";
 import sanitizeHtmlLib from "sanitize-html";
 import Link from "next/link";
@@ -39,6 +40,13 @@ const SCORE_COLORS: Record<string, string> = {
   Risky:    "text-amber-600 bg-amber-50 border-amber-200",
   Critical: "text-red-600 bg-red-50 border-red-200",
 };
+
+// Old dated duplicate URLs (pre-consolidation) permanently redirect to their
+// canonical evergreen post — preserves any link equity the old URLs earned.
+function redirectTarget(slug: string): string | null {
+  const target = (blogRedirects as Record<string, string>)[slug];
+  return target && target !== slug ? target : null;
+}
 
 async function getPost(slug: string) {
   const { data, error } = await supabase
@@ -94,7 +102,11 @@ async function getRelatedPosts(category: string, excludeSlug: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPost(slug);
-  if (!post) return { title: "Post not found" };
+  if (!post) {
+    const target = redirectTarget(slug);
+    if (target) permanentRedirect(`/blog/${target}`);
+    return { title: "Post not found" };
+  }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
   const canonicalUrl = `${siteUrl}/blog/${slug}`;
@@ -102,7 +114,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImage = post.hero_image_url || proxyImage(extractFirstImage(post.content), siteUrl);
 
   return {
-    title: `${post.title} | US Business Funding Climate Score`,
+    title: post.title,
     description: post.meta_description,
     alternates: {
       canonical: `/blog/${slug}`,
@@ -202,7 +214,11 @@ function readingTime(content: string): number {
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
   const post = await getPost(slug);
-  if (!post) notFound();
+  if (!post) {
+    const target = redirectTarget(slug);
+    if (target) permanentRedirect(`/blog/${target}`);
+    notFound();
+  }
 
   const [score, relatedPosts, { prev, next }] = await Promise.all([
     post.score_id ? getScore(post.score_id) : Promise.resolve(null),

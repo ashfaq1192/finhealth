@@ -1,11 +1,40 @@
 # Action Items — usfundingclimate.com
-**Last updated:** April 2026
+**Last updated:** June 2026
 
 These are tasks that require your manual input and cannot be automated.
 
 ---
 
 ## 🔴 High Priority (Do This Week)
+
+### 0a. Unblock AI crawlers in Cloudflare (added June 2026)
+**Problem:** Cloudflare's "Block AI bots" managed setting is injecting rules into your
+robots.txt that block GPTBot, ClaudeBot, CCBot, Google-Extended, and meta-externalagent.
+Your articles are written with AI-citation optimization (ChatGPT, Perplexity, AI Overviews),
+but those engines are forbidden from reading the site — the optimization is wasted until this is flipped.
+**Where:** Cloudflare dashboard → your zone (usfundingclimate.com) → **AI Crawl Control**
+(formerly "Block AI bots" under Security → Bots). Set it to **allow** AI crawlers
+(or at minimum allow: GPTBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot).
+**Tradeoff:** allowing these bots means AI companies may train on your content. For a
+traffic-dependent content site, citation visibility is worth far more than content protection.
+
+### 0b. Verify the broken Sitemap line in robots.txt is gone (added June 2026)
+**Problem found:** live robots.txt served `Sitemap: https://usfundingclimate.com           /sitemap.xml`
+(invalid URL — the `NEXT_PUBLIC_SITE_URL` env var in Cloudflare Pages has trailing whitespace).
+**Fixed in code:** `robots.ts` now trims the env var. After the next deploy, check
+`https://usfundingclimate.com/robots.txt` ends with a single clean
+`Sitemap: https://usfundingclimate.com/sitemap.xml`.
+**Better fix:** also edit the env var itself in Cloudflare Pages → Settings →
+Environment variables → `NEXT_PUBLIC_SITE_URL` → remove the trailing whitespace/newline.
+
+### 0c. Google Search Console — request removal-from-index for old duplicate URLs (added June 2026)
+The 68 duplicate posts were consolidated into 5 evergreen pages on 2026-06-12; old URLs
+now 301-redirect. In GSC:
+1. Confirm the property is verified (if not, do item 2 below first).
+2. Submit the sitemap again (it now lists only the 5 canonical posts).
+3. Use **URL Inspection** on the 5 canonical URLs → Request indexing.
+4. Do NOT bulk-remove the old URLs — the 301s pass their equity; Google will fold them in
+   within a few weeks.
 
 ### 1. Add LinkedIn URL to About page
 **File:** `frontend/app/about/page.tsx`

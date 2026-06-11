@@ -154,6 +154,8 @@ def _gemini_run_crew1(
     indicators_json: str,
     score_json: str,
     topic_override: str | None,
+    category_override: str | None = None,
+    keyword_override: str | None = None,
 ) -> tuple[str, str]:
     """
     Run economist + writer via direct Gemini REST API calls (no crewai routing).
@@ -163,7 +165,8 @@ def _gemini_run_crew1(
 
     # Build tasks just to extract their descriptions; we never run a Crew.
     econ_task, writer_task = build_tasks(
-        indicators_json, score_json, topic_override=topic_override
+        indicators_json, score_json, topic_override=topic_override,
+        category_override=category_override, keyword_override=keyword_override,
     )
     economist_system = (
         "You are a Senior US Macroeconomist with 15 years at the Federal Reserve Bank of Atlanta "
@@ -322,7 +325,24 @@ def run() -> int:
     if calendar_entry:
         print(f"[crew] Content calendar entry found: {calendar_entry.get('topic', '')[:80]}", flush=True)
     else:
-        print("[crew] No content calendar entry for today — using default category rotation", flush=True)
+        print("[crew] No content calendar entry for today — refreshing evergreen cornerstone page", flush=True)
+
+    # Step 0a: Skip if today already fully published. Makes the second daily cron
+    # (and manual re-runs) a safe no-op instead of double-publishing.
+    # Set FORCE_REGENERATE=1 to bypass.
+    if not os.environ.get("FORCE_REGENERATE"):
+        try:
+            _score_chk = supabase.table("daily_scores").select("id").eq("date", today).execute()
+            _post_chk = supabase.table("blog_posts").select("slug").eq("date", today).execute()
+            if _score_chk.data and _post_chk.data:
+                print(
+                    f"[crew] Already published for {today} "
+                    f"(slug={_post_chk.data[0]['slug']}). Nothing to do.",
+                    flush=True,
+                )
+                return 0
+        except Exception as _chk_exc:
+            print(f"[crew] Already-published pre-check failed (continuing): {_chk_exc}", flush=True)
 
     # Step 0b: Verify Groq API is reachable before spending 3 FRED calls on a doomed run.
     # Rate-limit (429) is non-fatal here — we fall back to Gemini for the LLM steps.
@@ -382,6 +402,8 @@ def run() -> int:
     economist_output = ""
     writer_output = ""
     _topic_override = calendar_entry.get("topic") if calendar_entry else None
+    _category_override = calendar_entry.get("category") if calendar_entry else None
+    _keyword_override = calendar_entry.get("seo_keyword") if calendar_entry else None
 
     _crew1_result: dict[str, Any] = {}
 
@@ -392,6 +414,8 @@ def run() -> int:
                 topic_override=_topic_override,
                 economist=econ_agent,
                 writer=write_agent,
+                category_override=_category_override,
+                keyword_override=_keyword_override,
             )
             c = Crew(
                 agents=[econ_agent, write_agent],
@@ -419,7 +443,10 @@ def run() -> int:
                         flush=True,
                     )
                     economist_output, writer_output = _retry(
-                        lambda: _gemini_run_crew1(indicators_json, score_json, _topic_override),
+                        lambda: _gemini_run_crew1(
+                        indicators_json, score_json, _topic_override,
+                        _category_override, _keyword_override,
+                    ),
                         attempts=2, delays=[30], label="Crew1/Gemini kickoff",
                     )
                 else:
@@ -429,7 +456,10 @@ def run() -> int:
             if os.environ.get("GEMINI_API_KEY"):
                 print("[crew] Using Gemini for Crew1 (Groq rate-limited at precheck, direct API).", flush=True)
                 economist_output, writer_output = _retry(
-                    lambda: _gemini_run_crew1(indicators_json, score_json, _topic_override),
+                    lambda: _gemini_run_crew1(
+                        indicators_json, score_json, _topic_override,
+                        _category_override, _keyword_override,
+                    ),
                     attempts=2, delays=[30], label="Crew1/Gemini kickoff",
                 )
             else:
@@ -484,7 +514,9 @@ def run() -> int:
             calendar_entry.get("category") if calendar_entry else get_todays_category()
         )
         from tasks import CATEGORY_SEO as _CSEO
-        primary_kw = _CSEO.get(category_for_editor, {}).get("primary", "small business funding")
+        primary_kw = (
+            (calendar_entry.get("seo_keyword") or "").strip() if calendar_entry else ""
+        ) or _CSEO.get(category_for_editor, {}).get("primary", "small business funding")
 
         _crew2_result: dict[str, Any] = {}
 
@@ -668,24 +700,45 @@ def run() -> int:
             score_id = score_resp.data["id"]
 
             now_iso = datetime.now(timezone.utc).isoformat()
-            raw_slug = post_data.get("slug", "")
-            # Sanitize AI-generated slug: lowercase, hyphens only, max 60 chars base
-            sanitized_slug = re.sub(r"[^a-z0-9-]", "", raw_slug.lower().replace(" ", "-"))
-            sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:60]
-            if not sanitized_slug:
-                title = post_data.get("title", "")
-                sanitized_slug = re.sub(r"[^a-z0-9-]", "", title.lower().replace(" ", "-"))
-                sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:60]
-            if not sanitized_slug:
-                sanitized_slug = f"{get_todays_category().lower().replace(' ', '-')}-funding-conditions"
-            # Append date to guarantee uniqueness across repeated category cycles
-            today_compact = today.replace("-", "")
-            sanitized_slug = f"{sanitized_slug}-{today_compact}"
             # Use category from calendar if available, else derive from rotation
             category = (
                 calendar_entry.get("category") if calendar_entry
                 else get_todays_category()
             )
+            from tasks import CANONICAL_SLUGS
+            is_calendar_post = bool(calendar_entry and (calendar_entry.get("topic") or "").strip())
+            if is_calendar_post:
+                # Pre-planned unique topic → its own permanent URL (NO date suffix —
+                # dated duplicate URLs are what triggered Google's scaled-content penalty).
+                raw_slug = post_data.get("slug", "")
+                sanitized_slug = re.sub(r"[^a-z0-9-]", "", raw_slug.lower().replace(" ", "-"))
+                sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:60]
+                if not sanitized_slug:
+                    title = post_data.get("title", "")
+                    sanitized_slug = re.sub(r"[^a-z0-9-]", "", title.lower().replace(" ", "-"))
+                    sanitized_slug = re.sub(r"-{2,}", "-", sanitized_slug).strip("-")[:60]
+                if not sanitized_slug:
+                    sanitized_slug = f"{category.lower().replace(' ', '-')}-funding-conditions"
+                # Strip any date the AI worked into the slug despite instructions
+                sanitized_slug = re.sub(r"-?\d{8}$", "", sanitized_slug).rstrip("-") or sanitized_slug
+                # If another date's post already owns this slug, suffix -2, -3, ...
+                base_slug = sanitized_slug
+                suffix = 2
+                while True:
+                    taken = (
+                        supabase.table("blog_posts")
+                        .select("date").eq("slug", sanitized_slug).execute()
+                    )
+                    if not taken.data or str(taken.data[0]["date"]) == today:
+                        break
+                    sanitized_slug = f"{base_slug}-{suffix}"
+                    suffix += 1
+            else:
+                # No calendar topic → refresh the category's evergreen cornerstone page
+                # in place: same URL, new content and date. Never mint a new URL.
+                sanitized_slug = CANONICAL_SLUGS.get(
+                    category, f"{category.lower().replace(' ', '-')}-funding-conditions"
+                )
             # Use pre-generated hero image from calendar if available — QA it first
             hero_image_url = (
                 calendar_entry.get("image_url")
@@ -718,13 +771,20 @@ def run() -> int:
                 post_row["hero_image_url"] = hero_image_url
                 print(f"[crew] Using pre-generated hero image from content_calendar")
 
+            # Calendar posts: one row per day → conflict on date (re-runs update today's row).
+            # Evergreen refresh: update the canonical row wherever its old date was → conflict on slug.
+            _conflict_col = "date" if is_calendar_post else "slug"
             _retry(
-                lambda: supabase.table("blog_posts").upsert(post_row, on_conflict="date").execute(),
+                lambda: supabase.table("blog_posts").upsert(post_row, on_conflict=_conflict_col).execute(),
                 attempts=3,
                 delays=[5, 15],
                 label="Supabase blog post upsert",
             )
-            print(f"[crew] Blog post upserted to blog_posts for {today}", flush=True)
+            print(
+                f"[crew] Blog post upserted ({'new calendar post' if is_calendar_post else 'evergreen refresh'}) "
+                f"for {today}: /blog/{sanitized_slug}",
+                flush=True,
+            )
 
             # Post-publish verification: fetch the live URL and confirm the article is accessible
             _site_url = os.environ.get("SITE_URL", "https://usfundingclimate.com").rstrip("/")

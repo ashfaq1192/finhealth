@@ -224,22 +224,31 @@ def _qa_image_gemini(
         return True, f"qa-error: {exc}"
 
 
-def _plan_calendar(dates: list[date]) -> list[dict]:
+def _plan_calendar(dates: list[date], existing_topics: list[str] | None = None) -> list[dict]:
     """
     Ask Groq to generate one topic + image_prompt per date.
     Returns list of dicts with keys: date, category, topic, seo_keyword, image_prompt
+
+    existing_topics: titles/topics already published or scheduled — the planner must
+    not duplicate or reword any of them. Topic uniqueness is the core defense against
+    the keyword cannibalization that suppressed the site's rankings.
     """
     from groq import Groq  # lazily imported so dry-run doesn't need it
 
     entries = []
     for d in dates:
         cat = _category_for_date(d)
-        seo = CATEGORY_SEO.get(cat, {})
         entries.append({
             "date": d.isoformat(),
             "category": cat,
-            "primary_keyword": seo.get("primary", cat),
         })
+
+    # The 5 cornerstone keywords are owned by permanently-refreshed evergreen pages.
+    # Calendar topics must NEVER target them — that recreates the duplication problem.
+    cornerstone_keywords = "\n".join(
+        f'  - "{seo["primary"]}"' for seo in CATEGORY_SEO.values()
+    )
+    avoid_list = "\n".join(f"  - {t}" for t in (existing_topics or [])[:120])
 
     # Build the composition reference table so Groq knows exact framing per category
     composition_table = "\n".join(
@@ -255,9 +264,25 @@ def _plan_calendar(dates: list[date]) -> list[dict]:
 For each entry output a JSON object with these exact keys:
 - date          (copy from input, YYYY-MM-DD)
 - category      (copy from input)
-- topic         (specific, high-CPC SEO topic — 6-12 words, must include the primary_keyword)
-- seo_keyword   (the primary_keyword from input, or a closely related long-tail variant)
-- image_prompt  (FLUX image generation prompt — follow the rules below exactly)
+- topic         (a specific long-tail article topic, 6-12 words — follow TOPIC RULES below)
+- seo_keyword   (the exact long-tail search query the article targets, 3-7 words)
+- image_prompt  (FLUX image generation prompt — follow the IMAGE PROMPT RULES below exactly)
+
+TOPIC RULES (critical — violations cause Google duplicate-content penalties):
+1. Every entry must target a DIFFERENT search query. No two entries may share a
+   seo_keyword or be rewordings of each other.
+2. NEVER target these cornerstone keywords — dedicated evergreen pages already own them:
+{cornerstone_keywords}
+3. Do NOT reuse or reword any topic in the ALREADY PUBLISHED list at the bottom.
+4. Vary the angle across the month. Rotate through: costs and rates, qualification
+   requirements, how-to guides, comparisons (X vs Y), mistakes to avoid, specific
+   questions (how long does X take, what credit score for X, how much does X cost),
+   and niche sub-audiences (owner-operators, franchisees, seasonal retailers,
+   food trucks, medical staffing, e-commerce sellers).
+5. Target informational queries a US small business owner actually types into Google.
+   Good: "how long does SBA loan approval take after underwriting"
+   Good: "factoring vs line of credit for staffing agency payroll"
+   Bad:  "SBA Loan Eligibility Requirements and Application Process" (generic, duplicative)
 
 IMAGE PROMPT RULES (critical — violations cause published images with cropped heads):
 1. Start from the COMPOSITION GUIDE for the entry's category (listed below).
@@ -272,6 +297,9 @@ COMPOSITION GUIDES BY CATEGORY:
 
 Input:
 {json.dumps(entries, indent=2)}
+
+ALREADY PUBLISHED (do not duplicate or reword):
+{avoid_list or "  (none)"}
 
 Return a JSON array of {len(entries)} objects.
 """
@@ -300,7 +328,7 @@ Return a JSON array of {len(entries)} objects.
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def run(target_month: str | None = None, dry_run: bool = False) -> int:
+def run(target_month: str | None = None, dry_run: bool = False, retopic: bool = False) -> int:
     # Determine target month
     today = date.today()
     if target_month:
@@ -317,9 +345,11 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
 
     print(f"[calendar] Target month: {year}-{month:02d} ({len(all_dates)} days)")
 
-    # Connect to Supabase — needed to skip already-generated dates
+    # Connect to Supabase — needed to skip already-generated dates and to build
+    # the duplicate-avoidance list for the topic planner.
     supabase = None
-    existing_dates: set[str] = set()
+    existing_rows: dict[str, dict] = {}
+    existing_topics: list[str] = []
     if not dry_run:
         supabase = create_client(
             os.environ["SUPABASE_URL"],
@@ -327,22 +357,39 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
         )
         resp = (
             supabase.table("content_calendar")
-            .select("scheduled_date, image_status")
+            .select("scheduled_date, image_url, image_status, used")
             .gte("scheduled_date", f"{year}-{month:02d}-01")
             .lte("scheduled_date", f"{year}-{month:02d}-{days_in_month}")
             .execute()
         )
-        for row in (resp.data or []):
-            if row.get("image_status") == "generated":
-                existing_dates.add(row["scheduled_date"])
+        existing_rows = {row["scheduled_date"]: row for row in (resp.data or [])}
 
-    dates_to_process = [d for d in all_dates if d.isoformat() not in existing_dates]
+        # Avoid-list: every published post title + every already-used calendar topic
+        posts_resp = supabase.table("blog_posts").select("title").execute()
+        existing_topics = [r["title"] for r in (posts_resp.data or []) if r.get("title")]
+        used_resp = (
+            supabase.table("content_calendar").select("topic").eq("used", True).execute()
+        )
+        existing_topics += [r["topic"] for r in (used_resp.data or []) if r.get("topic")]
+
+    if retopic:
+        # Re-plan topics for future, unused dates — images are kept if already generated.
+        today_d = date.today()
+        dates_to_process = [
+            d for d in all_dates
+            if d > today_d and not existing_rows.get(d.isoformat(), {}).get("used")
+        ]
+    else:
+        dates_to_process = [
+            d for d in all_dates
+            if existing_rows.get(d.isoformat(), {}).get("image_status") != "generated"
+        ]
     if not dates_to_process:
-        print("[calendar] All dates already have generated images. Nothing to do.")
+        print("[calendar] Nothing to do for this month.")
         return 0
 
-    print(f"[calendar] {len(dates_to_process)} dates need content "
-          f"({len(existing_dates)} already done)")
+    print(f"[calendar] {len(dates_to_process)} dates to process "
+          f"(retopic={retopic}, {len(existing_rows)} rows already exist)")
 
     # ── Step 1: Generate topics + image prompts via Groq ──────────────────────
     print("[calendar] Generating topics and image prompts via Groq...")
@@ -358,7 +405,7 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
             for d in dates_to_process
         ]
     else:
-        planned = _plan_calendar(dates_to_process)
+        planned = _plan_calendar(dates_to_process, existing_topics=existing_topics)
 
     if dry_run:
         print(f"[calendar] Planned {len(planned)} entries (dry run — Groq not called)")
@@ -379,7 +426,13 @@ def run(target_month: str | None = None, dry_run: bool = False) -> int:
         image_url = None
         image_status = "pending"
 
-        if not dry_run:
+        prior = existing_rows.get(d_str, {})
+        if not dry_run and prior.get("image_status") == "generated" and prior.get("image_url"):
+            # Retopic mode: keep the already-generated (and QA-passed) hero image.
+            image_url = prior["image_url"]
+            image_status = "generated"
+            print(f"          → reusing existing image: {image_url[:80]}")
+        elif not dry_run:
             try:
                 seed = int(d_str.replace("-", "")) % 2147483647
                 img_bytes = _generate_image_bytes(prompt, seed=seed)
@@ -458,5 +511,10 @@ if __name__ == "__main__":
         action="store_true",
         help="Plan topics only — no Modal calls, no DB writes",
     )
+    parser.add_argument(
+        "--retopic",
+        action="store_true",
+        help="Re-plan topics for future unused dates, reusing already-generated images",
+    )
     args = parser.parse_args()
-    sys.exit(run(target_month=args.month, dry_run=args.dry_run))
+    sys.exit(run(target_month=args.month, dry_run=args.dry_run, retopic=args.retopic))
