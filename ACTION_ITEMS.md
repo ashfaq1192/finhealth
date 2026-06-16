@@ -7,6 +7,23 @@ These are tasks that require your manual input and cannot be automated.
 
 ## 🔴 High Priority (Do This Week)
 
+### 0a0. Fix Gemini API — add billing or replace key (added June 2026)
+**Problem:** The Gemini API key in GitHub Actions secrets (`GEMINI_API_KEY`) is returning
+`"limit: 0"` for ALL free-tier quota metrics. This means the Google project that owns the key
+has NO free-tier access left (the limit itself is 0, not just the remaining quota — the
+free tier was likely revoked or the project is on a billing account where free tier is replaced
+by paid tier with no card attached).
+**Effect:** The pipeline fallback to Gemini (when Groq editor truncates) always fails.
+A code fix has been deployed that falls back to the writer draft in this case, so the pipeline
+won't fail outright — but articles will be unedited on those days.
+**Fix (choose one):**
+- **Option A (best):** Go to Google AI Studio (aistudio.google.com) → the project that owns
+  your API key → enable billing. Gemini Flash is very cheap (~$0.10/1M tokens).
+- **Option B:** Create a new Gemini API key in a fresh Google Cloud project that has free tier
+  access, then update the `GEMINI_API_KEY` secret in GitHub → Settings → Secrets → Actions.
+- **Option C:** If you don't want to add billing, leave it as-is. The writer-draft fallback
+  ensures posts still publish (unedited) when Groq truncates.
+
 ### 0a. Unblock AI crawlers in Cloudflare (added June 2026)
 **Problem:** Cloudflare's "Block AI bots" managed setting is injecting rules into your
 robots.txt that block GPTBot, ClaudeBot, CCBot, Google-Extended, and meta-externalagent.
