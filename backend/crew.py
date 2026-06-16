@@ -219,27 +219,29 @@ def _groq_expand_article(
 ) -> str:
     """
     Direct Groq API call to expand a short article to 1200+ words.
-    Uses a minimal prompt so the output token budget goes to the article, not instructions.
-    Called when both CrewAI editor and Gemini produce/fail QA due to word count.
+
+    Key design: asks for PLAIN MARKDOWN output (not JSON) so the model
+    doesn't waste output tokens on JSON syntax. Python reassembles the JSON.
+    This is the rescue path when the full CrewAI/editor prompts produce < 900 words.
     """
     from groq import Groq as _GroqClient
-    import json as _json
 
     client = _GroqClient(api_key=os.environ["GROQ_API_KEY"])
-    short_json = _json.dumps(short_post, ensure_ascii=False)
+    short_content = short_post.get("content", "")
+    title = short_post.get("title", f"{category} Business Funding Guide")
+
     system = (
-        "You are a US small business finance writer. "
-        "Expand the 'content' field of the JSON article to at least 1,200 words. "
-        "Keep all facts accurate. Keep the same title, slug, and meta_description. "
-        "Write in American English. Return ONLY valid JSON with keys: "
-        "title, slug, content, meta_description. No code fences."
+        "You are a US small business finance writer. Write in American English. "
+        "Output ONLY plain markdown article text — no JSON, no code fences, no commentary."
     )
     user = (
-        f"Expand this article — the 'content' field must reach 1,200+ words. "
-        f"Add specific details, real examples, and actionable context in each section. "
-        f"Use these economic indicators as supporting data:\n{score_json}\n"
-        f"Primary keyword (use 3-5 times naturally): {primary_keyword}\n\n"
-        f"ARTICLE TO EXPAND:\n{short_json}"
+        f"Rewrite and EXPAND the following article about '{title}' to at least 1,200 words. "
+        f"Keep all existing facts and structure. Add specific examples, explain each mechanism "
+        f"in 2-3 sentences, expand every H2 section with more detail. "
+        f"Use '{primary_keyword}' naturally 3-4 times. "
+        f"Reference these economic values inline: {score_json}\n\n"
+        f"ARTICLE TO EXPAND (currently too short — expand every section):\n{short_content}\n\n"
+        f"Write the EXPANDED article now. Plain markdown only, 1,200+ words."
     )
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -248,9 +250,16 @@ def _groq_expand_article(
             {"role": "user", "content": user},
         ],
         max_tokens=5000,
-        temperature=0.35,
+        temperature=0.4,
     )
-    return response.choices[0].message.content or ""
+    expanded_content = (response.choices[0].message.content or "").strip()
+    # Reassemble JSON — Python wraps the markdown, so the model has no JSON overhead
+    return json.dumps({
+        "title": short_post.get("title", title),
+        "slug": short_post.get("slug", ""),
+        "meta_description": short_post.get("meta_description", ""),
+        "content": expanded_content,
+    }, ensure_ascii=False)
 
 
 def _parse_json_output(raw: str) -> dict | list:
