@@ -109,6 +109,97 @@ def _is_rate_limit(exc: Exception) -> bool:
     )
 
 
+def _call_openai(system_prompt: str, user_prompt: str, max_tokens: int) -> str:
+    """
+    Direct HTTP call to OpenAI API (gpt-4o-mini).
+    Uses urllib.request (stdlib) — no extra dependencies beyond openai already in requirements.
+    """
+    api_key = os.environ["OPENAI_API_KEY"]
+    url = "https://api.openai.com/v1/chat/completions"
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as http_err:
+        body = ""
+        try:
+            body = http_err.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        print(
+            f"[openai] HTTP {http_err.code}. Body: {body[:500]!r}",
+            file=sys.stderr, flush=True,
+        )
+        raise
+    choices = result.get("choices", [])
+    if not choices:
+        raise RuntimeError(f"OpenAI returned no choices: {result}")
+    return choices[0].get("message", {}).get("content", "") or ""
+
+
+def _openai_run_editor(
+    writer_draft: str,
+    score_json: str,
+    category: str,
+    primary_keyword: str,
+) -> str:
+    """Run the editor step via GPT-4o-mini (cheap, reliable fallback for Groq truncation)."""
+    from tasks import build_editor_task
+    edt = build_editor_task(writer_draft, score_json, category, primary_keyword)
+    system = (
+        "You are the Chief Editorial Director of a major US financial media brand. "
+        "Apply editorial checks precisely: fix every failure, return only valid JSON. "
+        "Never summarize or shorten — preserve all substance and expand where word count is low. "
+        "Write in American English only."
+    )
+    return _call_openai(system, edt.description, max_tokens=5000)
+
+
+def _openai_expand_article(
+    short_post: dict,
+    score_json: str,
+    category: str,
+    primary_keyword: str,
+) -> str:
+    """
+    GPT-4o-mini expansion rescue: asks for plain markdown (no JSON overhead)
+    so the full token budget goes to article content. Python reassembles the JSON.
+    """
+    short_content = short_post.get("content", "")
+    title = short_post.get("title", f"{category} Business Funding Guide")
+    system = (
+        "You are a US small business finance writer. Write in American English. "
+        "Output ONLY plain markdown article text — no JSON, no code fences, no commentary."
+    )
+    user = (
+        f"Rewrite and EXPAND this article about '{title}' to at least 1,200 words. "
+        f"Keep all existing facts. Add specific examples and detail to every H2 section. "
+        f"Use '{primary_keyword}' naturally 3-4 times. "
+        f"Reference these economic values inline: {score_json}\n\n"
+        f"ARTICLE TO EXPAND:\n{short_content}\n\n"
+        f"Write the expanded article now. Plain markdown only, 1,200+ words."
+    )
+    expanded_content = _call_openai(system, user, max_tokens=5000).strip()
+    return json.dumps({
+        "title": short_post.get("title", title),
+        "slug": short_post.get("slug", ""),
+        "meta_description": short_post.get("meta_description", ""),
+        "content": expanded_content,
+    }, ensure_ascii=False)
+
+
 def _call_gemini_direct(system_prompt: str, user_prompt: str, max_tokens: int) -> str:
     """
     Direct HTTP call to Google Gemini REST API, bypassing crewai/litellm routing.
@@ -604,22 +695,45 @@ def run() -> int:
                     if not editor_output:
                         editor_output = getattr(getattr(editor_task_obj, "output", None), "raw", "") or ""
                 except Exception as _groq_crew2_exc:
-                    if _is_rate_limit(_groq_crew2_exc) and os.environ.get("GEMINI_API_KEY"):
-                        print(
-                            "[crew] Crew2/Groq rate-limited — switching editor to Gemini (direct API).",
-                            flush=True,
-                        )
-                        editor_output = _retry(
-                            lambda: _gemini_run_editor(
-                                writer_output, score_json, category_for_editor, primary_kw
-                            ),
-                            attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
-                        )
+                    if _is_rate_limit(_groq_crew2_exc):
+                        # OpenAI GPT-4o-mini first (cheap, reliable), then Gemini
+                        if os.environ.get("OPENAI_API_KEY"):
+                            print(
+                                "[crew] Crew2/Groq rate-limited — switching editor to OpenAI GPT-4o-mini.",
+                                flush=True,
+                            )
+                            editor_output = _retry(
+                                lambda: _openai_run_editor(
+                                    writer_output, score_json, category_for_editor, primary_kw
+                                ),
+                                attempts=2, delays=[15], label="Crew2/OpenAI editor kickoff",
+                            )
+                        elif os.environ.get("GEMINI_API_KEY"):
+                            print(
+                                "[crew] Crew2/Groq rate-limited — switching editor to Gemini (direct API).",
+                                flush=True,
+                            )
+                            editor_output = _retry(
+                                lambda: _gemini_run_editor(
+                                    writer_output, score_json, category_for_editor, primary_kw
+                                ),
+                                attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
+                            )
+                        else:
+                            raise
                     else:
                         raise
             else:
-                # Groq already rate-limited — use Gemini editor, no TPM sleep needed
-                if os.environ.get("GEMINI_API_KEY"):
+                # Groq already rate-limited — use OpenAI first, then Gemini
+                if os.environ.get("OPENAI_API_KEY"):
+                    print("[crew] Using OpenAI GPT-4o-mini for Crew2/editor (Groq rate-limited).", flush=True)
+                    editor_output = _retry(
+                        lambda: _openai_run_editor(
+                            writer_output, score_json, category_for_editor, primary_kw
+                        ),
+                        attempts=2, delays=[15], label="Crew2/OpenAI editor kickoff",
+                    )
+                elif os.environ.get("GEMINI_API_KEY"):
                     print("[crew] Using Gemini for Crew2/editor (Groq rate-limited, direct API).", flush=True)
                     editor_output = _retry(
                         lambda: _gemini_run_editor(
@@ -628,7 +742,7 @@ def run() -> int:
                         attempts=2, delays=[30], label="Crew2/Gemini editor kickoff",
                     )
                 else:
-                    raise RuntimeError("Groq rate-limited and GEMINI_API_KEY not set — cannot run Crew2.")
+                    raise RuntimeError("Groq rate-limited and no fallback API key set — cannot run Crew2.")
 
             print(f"[crew] Editor output preview: {editor_output[:120]}", flush=True)
 
@@ -669,88 +783,121 @@ def run() -> int:
             raw_content,
         ).rstrip()
 
-    # Step 3b: QA gate — with Gemini retry if word count is too low (truncated response)
+    # Step 3b: QA gate — multi-tier retry when word count is too low
+    # Fallback order: OpenAI GPT-4o-mini → Gemini → writer draft → Groq/OpenAI expansion
     if post_data:
         qa_passed, qa_reason = _qa_post_content(post_data)
         if not qa_passed:
             print(f"[crew] QA GATE FAILED: {qa_reason}.", file=sys.stderr)
-            # Low word count = truncated response from Groq TPM throttle.
-            # Retry the editor with Gemini using the writer draft.
-            if "word count" in qa_reason.lower() and writer_output and os.environ.get("GEMINI_API_KEY"):
-                print("[crew] Retrying editor with Gemini direct API (truncation detected)...", flush=True)
-                try:
-                    _gemini_editor_out = _retry(
-                        lambda: _gemini_run_editor(
-                            writer_output, score_json, category_for_editor, primary_kw
-                        ),
-                        attempts=2, delays=[30], label="Crew2/Gemini QA-retry editor",
-                    )
-                    if _gemini_editor_out:
-                        post_data = _parse_json_output(_gemini_editor_out)
-                        qa_passed2, qa_reason2 = _qa_post_content(post_data)
-                        if qa_passed2:
-                            wc = len(post_data["content"].split())
-                            print(f"[crew] Gemini editor QA passed: {wc} words.", flush=True)
+            if "word count" in qa_reason.lower() and writer_output:
+                # --- Tier 1: OpenAI GPT-4o-mini editor (cheap, no quota issues) ---
+                if os.environ.get("OPENAI_API_KEY"):
+                    print("[crew] QA retry: OpenAI GPT-4o-mini editor...", flush=True)
+                    try:
+                        _oai_out = _retry(
+                            lambda: _openai_run_editor(
+                                writer_output, score_json, category_for_editor, primary_kw
+                            ),
+                            attempts=2, delays=[15], label="OpenAI QA-retry editor",
+                        )
+                        if _oai_out:
+                            post_data = _parse_json_output(_oai_out)
+                            _qa2, _reason2 = _qa_post_content(post_data)
+                            if _qa2:
+                                print(f"[crew] OpenAI editor QA passed: {len(post_data['content'].split())} words.", flush=True)
+                            else:
+                                print(f"[crew] OpenAI editor QA failed: {_reason2}.", file=sys.stderr)
+                                post_data = None
                         else:
-                            print(f"[crew] Gemini editor QA also failed: {qa_reason2}. Discarding.", file=sys.stderr)
                             post_data = None
-                    else:
+                    except Exception as _oe:
+                        print(f"[crew] OpenAI QA-retry failed: {_oe}.", file=sys.stderr)
                         post_data = None
-                except Exception as _qe:
-                    print(f"[crew] Gemini QA-retry failed: {_qe}. Trying writer draft...", file=sys.stderr)
-                    post_data = None
+
+                # --- Tier 2: Gemini editor (if OpenAI unavailable or failed) ---
+                if post_data is None and os.environ.get("GEMINI_API_KEY"):
+                    print("[crew] QA retry: Gemini editor...", flush=True)
+                    try:
+                        _gem_out = _retry(
+                            lambda: _gemini_run_editor(
+                                writer_output, score_json, category_for_editor, primary_kw
+                            ),
+                            attempts=2, delays=[30], label="Gemini QA-retry editor",
+                        )
+                        if _gem_out:
+                            post_data = _parse_json_output(_gem_out)
+                            _qa2, _reason2 = _qa_post_content(post_data)
+                            if _qa2:
+                                print(f"[crew] Gemini editor QA passed: {len(post_data['content'].split())} words.", flush=True)
+                            else:
+                                print(f"[crew] Gemini editor QA failed: {_reason2}.", file=sys.stderr)
+                                post_data = None
+                        else:
+                            post_data = None
+                    except Exception as _ge:
+                        print(f"[crew] Gemini QA-retry failed: {_ge}.", file=sys.stderr)
+                        post_data = None
+
+                if post_data is None and not (os.environ.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY")):
+                    print("[crew] No fallback API keys configured.", file=sys.stderr)
+
             else:
-                print("[crew] Gemini not configured — trying writer draft.", file=sys.stderr)
+                print(f"[crew] Non-word-count QA failure: {qa_reason}. Blog post discarded.", file=sys.stderr)
                 post_data = None
 
-            # When editor truncated AND Gemini unavailable/exhausted, try writer draft directly.
-            # Writer draft is unedited but may already meet the 900-word minimum.
+            # --- Tier 3: raw writer draft direct QA check ---
             if post_data is None and "word count" in qa_reason.lower() and writer_output:
                 try:
                     _writer_draft = _parse_json_output(writer_output)
                     _qa_writ, _qa_writ_reason = _qa_post_content(_writer_draft)
                     if _qa_writ:
                         post_data = _writer_draft
-                        _wc = len(post_data["content"].split())
                         print(
-                            f"[crew] Writer draft QA passed ({_wc} words) — "
-                            "publishing unedited draft (editor/Gemini unavailable).",
+                            f"[crew] Writer draft QA passed ({len(post_data['content'].split())} words) — "
+                            "publishing unedited draft.",
                             flush=True,
                         )
                     else:
-                        print(
-                            f"[crew] Writer draft also fails QA: {_qa_writ_reason}. "
-                            "Trying Groq expansion...",
-                            file=sys.stderr,
-                        )
-                        # Both editor and writer are short — try a short-prompt Groq expansion
-                        # call. The shorter prompt leaves more output budget for the article.
+                        print(f"[crew] Writer draft also fails QA: {_qa_writ_reason}. Trying expansion...", file=sys.stderr)
                         _expand_src = _writer_draft
-                        try:
-                            _expanded_out = _retry(
-                                lambda: _groq_expand_article(
-                                    _expand_src, score_json, category_for_editor, primary_kw
-                                ),
-                                attempts=2, delays=[30], label="Groq expansion rescue",
-                            )
-                            if _expanded_out:
-                                _expanded = _parse_json_output(_expanded_out)
-                                _qa_exp, _qa_exp_reason = _qa_post_content(_expanded)
-                                if _qa_exp:
-                                    post_data = _expanded
-                                    _wc = len(post_data["content"].split())
-                                    print(
-                                        f"[crew] Groq expansion QA passed ({_wc} words).",
-                                        flush=True,
-                                    )
-                                else:
-                                    print(
-                                        f"[crew] Groq expansion also fails QA: {_qa_exp_reason}. "
-                                        "Blog post discarded.",
-                                        file=sys.stderr,
-                                    )
-                        except Exception as _ee:
-                            print(f"[crew] Groq expansion failed: {_ee}. Blog post discarded.", file=sys.stderr)
+                        # --- Tier 4a: OpenAI plain-markdown expansion ---
+                        if os.environ.get("OPENAI_API_KEY"):
+                            try:
+                                _exp_out = _retry(
+                                    lambda: _openai_expand_article(
+                                        _expand_src, score_json, category_for_editor, primary_kw
+                                    ),
+                                    attempts=2, delays=[15], label="OpenAI expansion rescue",
+                                )
+                                if _exp_out:
+                                    _expanded = _parse_json_output(_exp_out)
+                                    _qa_exp, _qa_exp_reason = _qa_post_content(_expanded)
+                                    if _qa_exp:
+                                        post_data = _expanded
+                                        print(f"[crew] OpenAI expansion QA passed ({len(post_data['content'].split())} words).", flush=True)
+                                    else:
+                                        print(f"[crew] OpenAI expansion QA failed: {_qa_exp_reason}.", file=sys.stderr)
+                            except Exception as _ee:
+                                print(f"[crew] OpenAI expansion failed: {_ee}.", file=sys.stderr)
+                        # --- Tier 4b: Groq plain-markdown expansion (last resort) ---
+                        if post_data is None:
+                            try:
+                                _exp_out = _retry(
+                                    lambda: _groq_expand_article(
+                                        _expand_src, score_json, category_for_editor, primary_kw
+                                    ),
+                                    attempts=2, delays=[30], label="Groq expansion rescue",
+                                )
+                                if _exp_out:
+                                    _expanded = _parse_json_output(_exp_out)
+                                    _qa_exp, _qa_exp_reason = _qa_post_content(_expanded)
+                                    if _qa_exp:
+                                        post_data = _expanded
+                                        print(f"[crew] Groq expansion QA passed ({len(post_data['content'].split())} words).", flush=True)
+                                    else:
+                                        print(f"[crew] Groq expansion QA failed: {_qa_exp_reason}. Blog post discarded.", file=sys.stderr)
+                            except Exception as _ee:
+                                print(f"[crew] Groq expansion failed: {_ee}. Blog post discarded.", file=sys.stderr)
                 except Exception as _we:
                     print(f"[crew] Could not parse writer draft: {_we}. Blog post discarded.", file=sys.stderr)
         else:
