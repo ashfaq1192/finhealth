@@ -211,6 +211,48 @@ def _gemini_run_editor(
     return _call_gemini_direct(editor_system, edt.description, max_tokens=5500)
 
 
+def _groq_expand_article(
+    short_post: dict,
+    score_json: str,
+    category: str,
+    primary_keyword: str,
+) -> str:
+    """
+    Direct Groq API call to expand a short article to 1200+ words.
+    Uses a minimal prompt so the output token budget goes to the article, not instructions.
+    Called when both CrewAI editor and Gemini produce/fail QA due to word count.
+    """
+    from groq import Groq as _GroqClient
+    import json as _json
+
+    client = _GroqClient(api_key=os.environ["GROQ_API_KEY"])
+    short_json = _json.dumps(short_post, ensure_ascii=False)
+    system = (
+        "You are a US small business finance writer. "
+        "Expand the 'content' field of the JSON article to at least 1,200 words. "
+        "Keep all facts accurate. Keep the same title, slug, and meta_description. "
+        "Write in American English. Return ONLY valid JSON with keys: "
+        "title, slug, content, meta_description. No code fences."
+    )
+    user = (
+        f"Expand this article — the 'content' field must reach 1,200+ words. "
+        f"Add specific details, real examples, and actionable context in each section. "
+        f"Use these economic indicators as supporting data:\n{score_json}\n"
+        f"Primary keyword (use 3-5 times naturally): {primary_keyword}\n\n"
+        f"ARTICLE TO EXPAND:\n{short_json}"
+    )
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=5000,
+        temperature=0.35,
+    )
+    return response.choices[0].message.content or ""
+
+
 def _parse_json_output(raw: str) -> dict | list:
     """Extract and repair JSON from CrewAI output which may include surrounding text."""
     raw = raw.strip()
@@ -668,9 +710,38 @@ def run() -> int:
                         )
                     else:
                         print(
-                            f"[crew] Writer draft also fails QA: {_qa_writ_reason}. Blog post discarded.",
+                            f"[crew] Writer draft also fails QA: {_qa_writ_reason}. "
+                            "Trying Groq expansion...",
                             file=sys.stderr,
                         )
+                        # Both editor and writer are short — try a short-prompt Groq expansion
+                        # call. The shorter prompt leaves more output budget for the article.
+                        _expand_src = _writer_draft
+                        try:
+                            _expanded_out = _retry(
+                                lambda: _groq_expand_article(
+                                    _expand_src, score_json, category_for_editor, primary_kw
+                                ),
+                                attempts=2, delays=[30], label="Groq expansion rescue",
+                            )
+                            if _expanded_out:
+                                _expanded = _parse_json_output(_expanded_out)
+                                _qa_exp, _qa_exp_reason = _qa_post_content(_expanded)
+                                if _qa_exp:
+                                    post_data = _expanded
+                                    _wc = len(post_data["content"].split())
+                                    print(
+                                        f"[crew] Groq expansion QA passed ({_wc} words).",
+                                        flush=True,
+                                    )
+                                else:
+                                    print(
+                                        f"[crew] Groq expansion also fails QA: {_qa_exp_reason}. "
+                                        "Blog post discarded.",
+                                        file=sys.stderr,
+                                    )
+                        except Exception as _ee:
+                            print(f"[crew] Groq expansion failed: {_ee}. Blog post discarded.", file=sys.stderr)
                 except Exception as _we:
                     print(f"[crew] Could not parse writer draft: {_we}. Blog post discarded.", file=sys.stderr)
         else:
