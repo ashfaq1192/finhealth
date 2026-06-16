@@ -18,6 +18,19 @@ but those engines are forbidden from reading the site — the optimization is wa
 **Tradeoff:** allowing these bots means AI companies may train on your content. For a
 traffic-dependent content site, citation visibility is worth far more than content protection.
 
+### 0a2. Fix Cloudflare Pages not deploying from GitHub (added June 2026)
+**Problem:** Commits pushed to master on GitHub (since June 12) are NOT being deployed to Cloudflare Pages.
+The live site still serves old code (broken robots.txt Sitemap URL, no 301 redirects for old blog slugs).
+**Diagnose in the Cloudflare dashboard:**
+1. Go to Cloudflare → Pages → `usfundingclimate` → **Deployments** tab
+2. Check if any deployment was triggered after June 12. If not, the GitHub integration webhook is broken.
+3. If there are failed deployments, click the failed build to see the error log.
+**Fix options:**
+- If no deployments after June 12: disconnect and reconnect the GitHub repository in Pages → Settings → Builds & Deployments → Branch and Build Settings
+- If builds are failing: read the Cloudflare build log (it's different from the local build) for the specific error
+- Alternatively: use the **Manage deployment** → **Retry deployment** button to manually trigger a new build from the latest commit
+**Note:** Local build (`npx @cloudflare/next-on-pages`) passes cleanly — the code is correct. The issue is the deploy trigger, not the code.
+
 ### 0b. Verify the broken Sitemap line in robots.txt is gone (added June 2026)
 **Problem found:** live robots.txt served `Sitemap: https://usfundingclimate.com           /sitemap.xml`
 (invalid URL — the `NEXT_PUBLIC_SITE_URL` env var in Cloudflare Pages has trailing whitespace).

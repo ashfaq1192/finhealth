@@ -646,11 +646,33 @@ def run() -> int:
                     else:
                         post_data = None
                 except Exception as _qe:
-                    print(f"[crew] Gemini QA-retry failed: {_qe}. Discarding.", file=sys.stderr)
+                    print(f"[crew] Gemini QA-retry failed: {_qe}. Trying writer draft...", file=sys.stderr)
                     post_data = None
             else:
-                print("[crew] Blog post discarded.", file=sys.stderr)
+                print("[crew] Gemini not configured — trying writer draft.", file=sys.stderr)
                 post_data = None
+
+            # When editor truncated AND Gemini unavailable/exhausted, try writer draft directly.
+            # Writer draft is unedited but may already meet the 900-word minimum.
+            if post_data is None and "word count" in qa_reason.lower() and writer_output:
+                try:
+                    _writer_draft = _parse_json_output(writer_output)
+                    _qa_writ, _qa_writ_reason = _qa_post_content(_writer_draft)
+                    if _qa_writ:
+                        post_data = _writer_draft
+                        _wc = len(post_data["content"].split())
+                        print(
+                            f"[crew] Writer draft QA passed ({_wc} words) — "
+                            "publishing unedited draft (editor/Gemini unavailable).",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            f"[crew] Writer draft also fails QA: {_qa_writ_reason}. Blog post discarded.",
+                            file=sys.stderr,
+                        )
+                except Exception as _we:
+                    print(f"[crew] Could not parse writer draft: {_we}. Blog post discarded.", file=sys.stderr)
         else:
             wc = len(post_data["content"].split())
             print(f"[crew] QA gate passed: {wc} words, structure OK.", flush=True)
