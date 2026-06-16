@@ -62,11 +62,11 @@ Resumed and diagnosed two failures:
 
 ## Outcome
 
-- ✅ Impact: Pipeline now has 3-tier fallback: Groq editor → Gemini editor → writer draft. June 15 post backfill triggered.
-- 🧪 Tests: ast.parse crew.py OK; next build OK; @cloudflare/next-on-pages build OK
+- ✅ Impact: Pipeline now has 4-tier fallback: Groq editor → Gemini editor → writer draft → Groq plain-markdown expansion. June 15 post published live at /blog/retail-business-funding-seasonal-fluctuations (1825 words).
+- 🧪 Tests: ast.parse crew.py OK; next build OK; @cloudflare/next-on-pages build OK; backfill run 27611437053 succeeded
 - 📁 Files: backend/crew.py, .github/workflows/main.yml, ACTION_ITEMS.md
-- 🔁 Next prompts: Verify June 15 backfill succeeded; verify Cloudflare Pages deploys after reconnect; add Gemini billing
-- 🧠 Reflection: Root cause of Gemini limit=0 is unclear — could be free-tier revocation, paid project with no billing card, or account-level restriction. Writer-draft fallback is the right defense regardless.
+- 🔁 Next prompts: Verify Cloudflare Pages deploys after reconnect in dashboard; add Gemini billing; trigger June 16 daily cron
+- 🧠 Reflection: The root cause of short Groq outputs was transient TPM pressure — the same code path succeeded after a gap. The 4-tier fallback ensures resilience regardless.
 
 ## Evaluation notes (flywheel)
 
