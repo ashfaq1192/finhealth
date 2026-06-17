@@ -84,8 +84,7 @@ export default function AboutPage() {
             — built to be sustainable at any traffic level.
           </p>
         </div>
-        {LINKEDIN_URL !== "YOUR_LINKEDIN_PROFILE_URL" && (
-          <div className="mt-5 pt-5 border-t border-slate-100">
+        <div className="mt-5 pt-5 border-t border-slate-100">
             <a
               href={LINKEDIN_URL}
               target="_blank"
@@ -98,7 +97,6 @@ export default function AboutPage() {
               View LinkedIn Profile
             </a>
           </div>
-        )}
       </div>
 
       {/* Mission statement */}
