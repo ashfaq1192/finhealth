@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 const AUTHOR_NAME = "M. Ashfaq";
 const AUTHOR_TITLE = "M.Phil Economics";
 const AUTHOR_EMAIL = "info@usfundingclimate.com";
-const LINKEDIN_URL = "YOUR_LINKEDIN_PROFILE_URL";
+const LINKEDIN_URL = "https://www.linkedin.com/in/ashfaq-ahmed-79264696";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AboutPage() {
